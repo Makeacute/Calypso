@@ -803,7 +803,7 @@ Item {
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true
             property bool workspaceShowOccupied: true
-            property bool workspaceShowAppIcons: true
+            property bool workspaceShowAppIcons: false
             property int workspaceMaxAppIcons: 4
             property bool workspaceScrollEnabled: true
             property bool workspaceScrollWrap: true

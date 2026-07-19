@@ -474,7 +474,7 @@
   "workspaceMinWidth": 26,
   "workspaceScrollEnabled": true,
   "workspaceScrollWrap": true,
-  "workspaceShowAppIcons": true,
+  "workspaceShowAppIcons": false,
   "workspaceShowNumbers": true,
   "workspaceShowOccupied": true,
   "workspaceToastTimeout": 1000,
