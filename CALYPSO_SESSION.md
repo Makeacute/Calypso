@@ -329,3 +329,37 @@ Date: 2026-07-19
 - ydotool media key was verified to change `playerctl` state `Playing -> Paused -> Playing`. ydotool mute key did not change PipeWire mute state on this session, so audio morph used `wpctl`; no safe ydotool trigger was available for Wi-Fi online/offline without toggling radios.
 - 60 second idle sample on PID `84079`: `0.890s` CPU time, `1.483%` of one core.
 - Current log window had no Calypso/QML warnings.
+
+## Phase 2C Settings Panel Redesign
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `SettingsPanel.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Replaced Overview status chips with elevated stat cards using icon, value, and tonal surface treatment.
+- Added Layout-page font role pickers for Sans, Mono, and Icon roles with live preview tiles sourced from `fc-list`.
+- Added settings controls for Phase 2A/2B options: module popup gauges/sparklines/history, workspace app icons/max icons, and icon morph transitions.
+- Added a page transition for SettingsPanel page/detail changes using `settings.motionNormal`; `reduceMotion` collapses it to an instant swap.
+
+### Decisions Made
+
+- Kept font discovery lazy: the `fc-list` scan runs when SettingsPanel opens, not at shell startup or while the panel is closed.
+- Used the existing `settings.setString` path for picker selections so old configs keep loading through `Settings.qml` fallbacks.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured screenshots: `/tmp/calypso-phase2c-20260719/overview.png`, `layout-fonts.png`, `detail-network.png`, and `detail-workspaces.png`.
+- Verified `fc-list` is installed and returns real local families including `CaskaydiaCove Nerd Font`, `DejaVu Sans`, `JetBrainsMono Nerd Font`, `Material Symbols Rounded`, `Noto Color Emoji`, and `Rubik`.
+- Tried to select a font tile through `ydotool`; the virtual click did not reach the Quickshell popup on this session, so the picker was verified by rendered tile list, code path inspection, and restored settings state rather than a successful synthetic click.
+- Recorded page transition motion at `/tmp/calypso-phase2c-20260719/page-transition-motion.mp4`; reviewed extracted contact sheet `page-transition-motion-contact.png`.
+- Recorded reduce-motion transition at `/tmp/calypso-phase2c-20260719/page-transition-reduce-motion.mp4`; reviewed `page-transition-reduce-motion-contact.png` and confirmed the page swap collapsed to instant.
+- `ffmpeg` still cannot capture this Wayland session directly, so `wf-recorder` was used for screen capture and `ffmpeg` for frame extraction.
+- Restarted Quickshell after verification churn. Fresh instance `8k72ze8fit` loaded successfully.
+- Fresh closed-panel 60 second idle sample on PID `103112`: `0.950s` CPU time, `1.583%` of one core.
+- Fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.

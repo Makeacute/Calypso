@@ -22,6 +22,11 @@ PopupWindow {
     property string selectedWallpaperPath: settings ? settings.wallpaperSelectedPreview : ""
     property int settingsChangeCount: 0
     property var dependencyStatus: ({})
+    property var installedFonts: []
+    property bool fontScanRequested: false
+    property real pageTransitionOffset: 0
+    property real pageTransitionOpacity: 1
+    property int pageTransitionDirection: 1
     readonly property bool detailOpen: detailPage.length > 0
     readonly property real sidebarWidth: Math.min(Math.round(panelWidth * 0.24), settings ? settings.effectiveSpacingXL * 7 : 168)
     readonly property int panelWidth: settings ? Math.round(Math.min(availableWidth(), Math.max(settings.settingsPanelWidth, settings.effectiveSpacingXL * 29))) : 780
@@ -136,6 +141,7 @@ PopupWindow {
         detailPage = "";
         activePage = pageExists(page) ? page : "overview";
         if (contentFlick) contentFlick.contentY = 0;
+        animatePageTransition(1);
     }
 
     function openPage(page) {
@@ -232,6 +238,49 @@ PopupWindow {
         dependencyProc.running = true;
     }
 
+    function fallbackFonts() {
+        const names = [
+            settings ? settings.fontFamilySans : "",
+            settings ? settings.fontFamilyMono : "",
+            settings ? settings.fontFamilyIcon : "",
+            settings ? settings.fontFamily : ""
+        ];
+        const seen = {};
+        const next = [];
+        for (let i = 0; i < names.length; i++) {
+            const name = String(names[i] || "").trim();
+            if (name.length <= 0 || seen[name]) continue;
+            seen[name] = true;
+            next.push(name);
+        }
+        return next.length > 0 ? next : ["sans", "monospace"];
+    }
+
+    function refreshFontList() {
+        if (fontProc.running) return;
+        fontScanRequested = true;
+        fontProc.command = [
+            "sh",
+            "-c",
+            "if command -v fc-list >/dev/null 2>&1; then fc-list --format='%{family}\\n' | awk 'NF { split($0, a, \",\"); gsub(/^[[:space:]]+|[[:space:]]+$/, \"\", a[1]); if (length(a[1]) > 0 && !seen[a[1]]++) print a[1]; }' | sort; fi"
+        ];
+        fontProc.running = true;
+    }
+
+    function animatePageTransition(direction) {
+        if (!settings || settings.motionNormal <= 0) {
+            pageTransition.stop();
+            pageTransitionOffset = 0;
+            pageTransitionOpacity = 1;
+            return;
+        }
+
+        pageTransitionDirection = direction >= 0 ? 1 : -1;
+        pageTransitionOffset = pageTransitionDirection * settings.effectiveSpacingM;
+        pageTransitionOpacity = 0;
+        pageTransition.restart();
+    }
+
     function clearChangeCount() {
         settingsChangeCount = 0;
     }
@@ -239,11 +288,13 @@ PopupWindow {
     function openDetail(page) {
         detailPage = page;
         if (contentFlick) contentFlick.contentY = 0;
+        animatePageTransition(1);
     }
 
     function back() {
         detailPage = "";
         if (contentFlick) contentFlick.contentY = 0;
+        animatePageTransition(-1);
     }
 
     function activeTitle() {
@@ -303,6 +354,7 @@ PopupWindow {
         if (selectedWallpaperPath.length <= 0 && settings && settings.wallpaperSelectedPreview.length > 0)
             selectedWallpaperPath = settings.wallpaperSelectedPreview;
         refreshDependencyStatus();
+        refreshFontList();
     }
 
     function close() {
@@ -349,6 +401,49 @@ PopupWindow {
 
         stderr: StdioCollector {
             onStreamFinished: if (String(text || "").trim().length > 0 && root.settings) root.settings.setString("wallpaperLastError", String(text || "").trim())
+        }
+    }
+
+    Process {
+        id: fontProc
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const next = [];
+                const seen = {};
+                const lines = String(text || "").split("\n");
+                for (let i = 0; i < lines.length; i++) {
+                    const family = lines[i].trim();
+                    if (family.length <= 0 || seen[family]) continue;
+                    seen[family] = true;
+                    next.push(family);
+                }
+                root.installedFonts = next.length > 0 ? next : root.fallbackFonts();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: if (String(text || "").trim().length > 0) root.installedFonts = root.fallbackFonts()
+        }
+    }
+
+    ParallelAnimation {
+        id: pageTransition
+
+        NumberAnimation {
+            target: root
+            property: "pageTransitionOffset"
+            to: 0
+            duration: settings.motionNormal
+            easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+            target: root
+            property: "pageTransitionOpacity"
+            to: 1
+            duration: settings.motionNormal
+            easing.type: Easing.OutCubic
         }
     }
 
@@ -706,6 +801,8 @@ PopupWindow {
                             id: pageLoader
 
                             width: parent.width
+                            x: root.pageTransitionOffset
+                            opacity: root.pageTransitionOpacity
                             sourceComponent: root.detailOpen ? root.componentForDetail(root.detailPage) : root.componentForPage(root.activePage)
                         }
                     }
@@ -830,6 +927,17 @@ PopupWindow {
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Radius scale"; value: settings.radiusScale; minimum: 0.5; maximum: 2.0; step: 0.1; suffix: "x"; onValueRequested: function(value) { settings.setReal("radiusScale", value, minimum, maximum, step); } }
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Font size"; value: settings.fontSize; minimum: 10; maximum: 18; step: 1; suffix: "px"; onValueRequested: function(value) { settings.setNumber("fontSize", value, minimum, maximum); } }
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Icon size"; value: settings.iconSize; minimum: 12; maximum: 24; step: 1; suffix: "px"; onValueRequested: function(value) { settings.setNumber("iconSize", value, minimum, maximum); } }
+            }
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                title: "Fonts"
+
+                FontRolePicker { width: parent.width; theme: root.theme; settings: root.settings; label: "Sans"; roleKey: "fontFamilySans"; value: settings.fontFamilySans; previewText: "Interface Aa 123" }
+                FontRolePicker { width: parent.width; theme: root.theme; settings: root.settings; label: "Mono"; roleKey: "fontFamilyMono"; value: settings.fontFamilyMono; previewText: "12:48  /  76%" }
+                FontRolePicker { width: parent.width; theme: root.theme; settings: root.settings; label: "Icon"; roleKey: "fontFamilyIcon"; value: settings.fontFamilyIcon; previewText: "󰣇 󰕾 󰤨" }
             }
 
             SectionBlock {
@@ -1077,6 +1185,7 @@ PopupWindow {
 
                 ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Profile"; value: settings.animationProfile; choices: ["Physical", "Snappy", "Calm", "Instant"]; onChoiceRequested: function(choice) { settings.setAnimationProfile(choice); } }
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Reduce motion"; checked: settings.reduceMotion; onToggled: function(checked) { settings.setReduceMotion(checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Icon morphs"; checked: settings.iconMorphTransitions; onToggled: function(checked) { settings.setValue("iconMorphTransitions", checked); } }
                 ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Popup motion"; value: settings.popupMotion; choices: ["none", "fade", "slide"]; onChoiceRequested: function(choice) { settings.setEnum("popupMotion", choice, choices, "slide"); } }
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Base duration"; value: settings.animationBaseMs; minimum: 0; maximum: 400; step: 10; suffix: "ms"; onValueRequested: function(value) { settings.setAnimationMs(value); } }
             }
@@ -1108,7 +1217,11 @@ PopupWindow {
                 title: "Module popups"
 
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Pinned popups"; checked: settings.modulePopupPinned; onToggled: function(checked) { settings.setValue("modulePopupPinned", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Gauge heroes"; checked: settings.modulePopupShowGauge; onToggled: function(checked) { settings.setValue("modulePopupShowGauge", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Sparkline history"; checked: settings.modulePopupShowSparkline; onToggled: function(checked) { settings.setValue("modulePopupShowSparkline", checked); } }
                 ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Default tab"; value: settings.modulePopupDefaultTab; choices: ["Overview", "Controls", "Diagnostics"]; onChoiceRequested: function(choice) { settings.setEnum("modulePopupDefaultTab", choice, choices, "Overview"); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "History samples"; value: settings.modulePopupHistorySamples; minimum: 8; maximum: 64; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("modulePopupHistorySamples", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Network scale"; value: settings.modulePopupNetworkScaleKib; minimum: 1024; maximum: 102400; step: 1024; suffix: " KiB"; onValueRequested: function(value) { settings.setNumber("modulePopupNetworkScaleKib", value, minimum, maximum); } }
             }
 
             SectionBlock {
@@ -1243,6 +1356,8 @@ PopupWindow {
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Enabled"; checked: settings.enabled("workspaces"); onToggled: function(checked) { settings.setModuleEnabled("workspaces", checked); } }
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Show numbers"; checked: settings.workspaceShowNumbers; onToggled: function(checked) { settings.setValue("workspaceShowNumbers", checked); } }
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Occupied marker"; checked: settings.workspaceShowOccupied; onToggled: function(checked) { settings.setValue("workspaceShowOccupied", checked); } }
+            ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "App icons"; checked: settings.workspaceShowAppIcons; onToggled: function(checked) { settings.setValue("workspaceShowAppIcons", checked); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Max app icons"; value: settings.workspaceMaxAppIcons; minimum: 1; maximum: 8; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("workspaceMaxAppIcons", value, minimum, maximum); } }
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Scroll switch"; checked: settings.workspaceScrollEnabled; onToggled: function(checked) { settings.setValue("workspaceScrollEnabled", checked); } }
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Wrap scroll"; checked: settings.workspaceScrollWrap; onToggled: function(checked) { settings.setValue("workspaceScrollWrap", checked); } }
             ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Indicator"; value: settings.workspaceIndicatorStyle; choices: ["pill", "underline", "dot"]; onChoiceRequested: function(choice) { settings.setEnum("workspaceIndicatorStyle", choice, choices, "pill"); } }
@@ -1744,52 +1859,92 @@ PopupWindow {
             width: Math.max(settings.effectiveSpacingXL * 6, parent.width * 0.28)
             spacing: settings.effectiveContentSpacing
 
-            MetricChip { width: parent.width; theme: hero.theme; settings: hero.settings; label: "Bar"; value: settings.barHeight + "px / " + settings.barPosition }
-            MetricChip { width: parent.width; theme: hero.theme; settings: hero.settings; label: "Modules"; value: settings.leftModules.length + "-" + settings.centerModules.length + "-" + settings.rightModules.length }
-            MetricChip { width: parent.width; theme: hero.theme; settings: hero.settings; label: "OSD"; value: settings.osdEnabled ? root.displayLabel(settings.osdPosition) : "off" }
+            StatCard { width: parent.width; theme: hero.theme; settings: hero.settings; icon: "󰖲"; label: "Bar"; value: settings.barHeight + "px / " + settings.barPosition }
+            StatCard { width: parent.width; theme: hero.theme; settings: hero.settings; icon: "󱂬"; label: "Modules"; value: settings.leftModules.length + "-" + settings.centerModules.length + "-" + settings.rightModules.length }
+            StatCard { width: parent.width; theme: hero.theme; settings: hero.settings; icon: "󰕾"; label: "OSD"; value: settings.osdEnabled ? root.displayLabel(settings.osdPosition) : "off" }
         }
     }
 
-    component MetricChip: Rectangle {
-        id: metric
+    component StatCard: Rectangle {
+        id: stat
 
         property var theme
         property var settings
+        property string icon: ""
         property string label: ""
         property string value: ""
 
-        implicitHeight: Math.max(settings.controlHeight, labelText.implicitHeight + valueText.implicitHeight + settings.effectiveGroupPadding)
+        implicitHeight: Math.max(settings.controlHeight * 1.45, statContent.implicitHeight + settings.effectivePillPadding * 2)
         radius: settings.effectivePillRadius
-        color: theme.alpha(theme.text, 0.035)
+        color: theme.alpha(theme.surfaceContainer, 0.62)
         border.color: theme.outlineSubtle
         border.width: settings.effectiveBorderWidth
         antialiasing: true
+        clip: true
 
-        Text {
-            id: labelText
+        Rectangle {
             anchors.left: parent.left
-            anchors.leftMargin: settings.effectivePillPadding
-            anchors.verticalCenter: parent.verticalCenter
-            text: metric.label
-            color: theme.textMuted
-            font.family: settings.fontFamily
-            font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.72))
-            font.weight: Font.Medium
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(settings.effectiveBorderWidth, Math.round(settings.effectiveGroupPadding * 0.45))
+            color: theme.gloss
+            antialiasing: true
         }
 
-        Text {
-            id: valueText
+        Row {
+            id: statContent
+
+            anchors.left: parent.left
             anchors.right: parent.right
-            anchors.rightMargin: settings.effectivePillPadding
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - labelText.implicitWidth - settings.effectivePillPadding * 3
-            text: metric.value
-            color: theme.text
-            elide: Text.ElideRight
-            horizontalAlignment: Text.AlignRight
-            font.family: settings.fontFamily
-            font.pixelSize: Math.max(9, Math.round(settings.effectiveFontSize * 0.82))
-            font.weight: Font.DemiBold
+            anchors.leftMargin: settings.effectivePillPadding
+            anchors.rightMargin: settings.effectivePillPadding
+            spacing: settings.effectiveContentSpacing
+
+            Rectangle {
+                width: settings.controlHeight
+                height: width
+                anchors.verticalCenter: parent.verticalCenter
+                radius: settings.effectivePillRadius
+                color: theme.surfaceActive
+                border.color: theme.outlineActive
+                border.width: settings.effectiveBorderWidth
+                antialiasing: true
+
+                Text {
+                    anchors.centerIn: parent
+                    text: stat.icon
+                    color: theme.primary
+                    font.family: settings.fontFamilyIcon
+                    font.pixelSize: settings.effectiveIconSize
+                }
+            }
+
+            Column {
+                width: parent.width - settings.controlHeight - parent.spacing
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.24))
+
+                Text {
+                    width: parent.width
+                    text: stat.label
+                    color: theme.textMuted
+                    elide: Text.ElideRight
+                    font.family: settings.fontFamilySans
+                    font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.72))
+                    font.weight: Font.Medium
+                }
+
+                Text {
+                    width: parent.width
+                    text: stat.value
+                    color: theme.text
+                    elide: Text.ElideRight
+                    font.family: settings.fontFamilyMono
+                    font.pixelSize: Math.max(9, Math.round(settings.effectiveFontSize * 0.92))
+                    font.weight: Font.DemiBold
+                }
+            }
         }
     }
 
@@ -2405,6 +2560,168 @@ PopupWindow {
                 clip: true
                 onTextEdited: inputRoot.textRequested(editor.text)
             }
+        }
+    }
+
+    component FontRolePicker: Column {
+        id: picker
+
+        property var theme
+        property var settings
+        property string label: ""
+        property string roleKey: ""
+        property string value: ""
+        property string previewText: ""
+        readonly property var fontFamilies: root.installedFonts.length > 0 ? root.installedFonts : root.fallbackFonts()
+
+        spacing: settings.effectiveContentSpacing
+
+        Row {
+            width: parent.width
+            height: Math.max(settings.controlHeight, currentPreview.implicitHeight)
+            spacing: settings.effectiveContentSpacing
+
+            Text {
+                id: roleLabel
+
+                width: Math.max(settings.effectiveSpacingXL * 3, parent.width * 0.18)
+                height: parent.height
+                text: picker.label
+                color: theme.text
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+                font.family: settings.fontFamilySans
+                font.pixelSize: settings.effectiveFontSize
+                font.weight: Font.DemiBold
+            }
+
+            Rectangle {
+                id: currentPreview
+
+                width: parent.width - parent.spacing - roleLabel.width
+                height: Math.max(settings.controlHeight, currentText.implicitHeight + settings.effectiveGroupPadding * 2)
+                radius: settings.effectivePillRadius
+                color: theme.alpha(theme.surfaceContainer, 0.52)
+                border.color: theme.outlineSubtle
+                border.width: settings.effectiveBorderWidth
+                antialiasing: true
+                clip: true
+
+                Text {
+                    id: currentText
+
+                    anchors.left: parent.left
+                    anchors.right: currentName.left
+                    anchors.leftMargin: settings.effectivePillPadding
+                    anchors.rightMargin: settings.effectiveContentSpacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: picker.previewText
+                    color: theme.text
+                    elide: Text.ElideRight
+                    font.family: picker.value
+                    font.pixelSize: settings.effectiveFontSize
+                    font.weight: Font.Medium
+                }
+
+                Text {
+                    id: currentName
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: settings.effectivePillPadding
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width * 0.46
+                    text: picker.value
+                    color: theme.textMuted
+                    elide: Text.ElideMiddle
+                    horizontalAlignment: Text.AlignRight
+                    font.family: settings.fontFamilySans
+                    font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.76))
+                    font.weight: Font.Medium
+                }
+            }
+        }
+
+        Flow {
+            width: parent.width
+            spacing: settings.effectiveContentSpacing
+
+            Repeater {
+                model: picker.fontFamilies
+
+                FontChoiceTile {
+                    required property var modelData
+
+                    width: Math.max(settings.effectiveSpacingXL * 5.2, (parent.width - parent.spacing * 2) / 3)
+                    theme: picker.theme
+                    settings: picker.settings
+                    family: String(modelData)
+                    previewText: picker.previewText
+                    selected: String(modelData) === picker.value
+                    onPressed: picker.settings.setString(picker.roleKey, family)
+                }
+            }
+        }
+    }
+
+    component FontChoiceTile: Rectangle {
+        id: fontTile
+
+        property var theme
+        property var settings
+        property string family: ""
+        property string previewText: ""
+        property bool selected: false
+
+        signal pressed()
+
+        implicitHeight: settings.controlHeight * 1.55
+        radius: settings.effectivePillRadius
+        color: selected ? theme.surfaceActive : hover.containsMouse ? theme.surfaceHover : theme.alpha(theme.surfaceContainer, 0.38)
+        border.color: selected ? theme.outlineActive : hover.containsMouse ? theme.outlineActive : theme.outlineSubtle
+        border.width: settings.effectiveBorderWidth
+        scale: hover.containsMouse ? 1.006 : 1
+        antialiasing: true
+        clip: true
+
+        Behavior on color { ColorAnimation { duration: settings.motionNormal } }
+        Behavior on border.color { ColorAnimation { duration: settings.motionNormal } }
+        Behavior on scale { NumberAnimation { duration: settings.motionHover; easing.type: Easing.OutCubic } }
+
+        Column {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: settings.effectivePillPadding
+            anchors.rightMargin: settings.effectivePillPadding
+            spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.25))
+
+            Text {
+                width: parent.width
+                text: fontTile.previewText
+                color: selected ? theme.text : theme.text
+                elide: Text.ElideRight
+                font.family: fontTile.family
+                font.pixelSize: settings.effectiveFontSize
+                font.weight: Font.Medium
+            }
+
+            Text {
+                width: parent.width
+                text: fontTile.family
+                color: selected ? theme.primary : theme.textMuted
+                elide: Text.ElideMiddle
+                font.family: settings.fontFamilySans
+                font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.72))
+                font.weight: selected ? Font.DemiBold : Font.Medium
+            }
+        }
+
+        MouseArea {
+            id: hover
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: fontTile.pressed()
         }
     }
 
