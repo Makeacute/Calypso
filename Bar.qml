@@ -39,11 +39,18 @@ PanelWindow {
             item.close();
     }
 
+    function closeToolPanels() {
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+    }
+
     function showSettings(anchorItem) {
         ensureInteractionPhase();
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeToolPanels();
         if (settingsPanelLoader.item)
             settingsPanelLoader.item.toggle(anchorItem);
     }
@@ -53,6 +60,7 @@ PanelWindow {
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeToolPanels();
         if (clockPanelLoader.item)
             clockPanelLoader.item.toggle(anchorItem);
     }
@@ -62,15 +70,67 @@ PanelWindow {
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeToolPanels();
         if (dashboardPanelLoader.item)
             dashboardPanelLoader.item.toggle(anchorItem);
     }
 
-    function showModuleDetails(moduleName, anchorItem) {
+    function showNotepad(anchorItem) {
         ensureInteractionPhase();
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+        if (notepadPanelLoader.item)
+            notepadPanelLoader.item.toggle(anchorItem);
+    }
+
+    function showClipboard(anchorItem) {
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+        if (clipboardPanelLoader.item)
+            clipboardPanelLoader.item.toggle(anchorItem);
+    }
+
+    function showProcessList(anchorItem) {
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        if (processPanelLoader.item)
+            processPanelLoader.item.toggle(anchorItem);
+        closeLoadedPanel(dashboardPanelLoader);
+    }
+
+    function showModuleDetails(moduleName, anchorItem) {
+        const name = String(moduleName || "");
+        if (name === "notepad" || name === "scratchpad" || name === "notes") {
+            showNotepad(anchorItem);
+            return;
+        }
+        if (name === "clipboard" || name === "cliphist" || name === "clip") {
+            showClipboard(anchorItem);
+            return;
+        }
+        if (name === "processes" || name === "processList" || name === "tasks") {
+            showProcessList(anchorItem);
+            return;
+        }
+
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeToolPanels();
         if (moduleDetailsPanelLoader.item)
             moduleDetailsPanelLoader.item.toggle(moduleName, anchorItem);
     }
@@ -80,15 +140,31 @@ PanelWindow {
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeToolPanels();
         if (settingsPanelLoader.item)
             settingsPanelLoader.item.openPage(page);
     }
 
     function openModuleDetails(moduleName) {
+        const name = String(moduleName || "");
+        if (name === "notepad" || name === "scratchpad" || name === "notes") {
+            showNotepad(null);
+            return;
+        }
+        if (name === "clipboard" || name === "cliphist" || name === "clip") {
+            showClipboard(null);
+            return;
+        }
+        if (name === "processes" || name === "processList" || name === "tasks") {
+            showProcessList(null);
+            return;
+        }
+
         ensureInteractionPhase();
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
+        closeToolPanels();
         if (moduleDetailsPanelLoader.item)
             moduleDetailsPanelLoader.item.open(moduleName, null);
     }
@@ -128,6 +204,30 @@ PanelWindow {
             bar.closeLoadedPanel(dashboardPanelLoader);
         }
 
+        function openNotepad(): void {
+            bar.showNotepad(null);
+        }
+
+        function closeNotepad(): void {
+            bar.closeLoadedPanel(notepadPanelLoader);
+        }
+
+        function openClipboard(): void {
+            bar.showClipboard(null);
+        }
+
+        function closeClipboard(): void {
+            bar.closeLoadedPanel(clipboardPanelLoader);
+        }
+
+        function openProcesses(): void {
+            bar.showProcessList(null);
+        }
+
+        function closeProcesses(): void {
+            bar.closeLoadedPanel(processPanelLoader);
+        }
+
         function openSettingsPage(page: string): void {
             bar.openSettingsPage(page);
         }
@@ -137,6 +237,7 @@ PanelWindow {
             bar.closeLoadedPanel(clockPanelLoader);
             bar.closeLoadedPanel(dashboardPanelLoader);
             bar.closeLoadedPanel(moduleDetailsPanelLoader);
+            bar.closeToolPanels();
             if (settingsPanelLoader.item)
                 settingsPanelLoader.item.openModuleOptions(moduleName);
         }
@@ -172,6 +273,7 @@ PanelWindow {
             bar.closeLoadedPanel(settingsPanelLoader);
             bar.closeLoadedPanel(clockPanelLoader);
             bar.closeLoadedPanel(dashboardPanelLoader);
+            bar.closeToolPanels();
             if (moduleDetailsPanelLoader.item)
                 moduleDetailsPanelLoader.item.openTab(moduleName, tabName, null);
         }
@@ -619,6 +721,46 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             DashboardPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+                onProcessesRequested: function(anchorItem) { bar.showProcessList(anchorItem); }
+            }
+        }
+    }
+
+    Loader {
+        id: notepadPanelLoader
+
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            NotepadPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
+    }
+
+    Loader {
+        id: clipboardPanelLoader
+
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            ClipboardPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
+    }
+
+    Loader {
+        id: processPanelLoader
+
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            ProcessPanel {
                 theme: theme
                 settings: settings
                 panelWindow: bar

@@ -406,3 +406,60 @@ Date: 2026-07-19
 - Closed-dashboard 60 second sample on PID `137051`: `1.730s` CPU time, `2.883%` of one core.
 - Open-dashboard 60 second sample on PID `137051`: `1.630s` CPU time, `2.717%` of one core.
 - Current log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 4 Standalone Popovers
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `DashboardPanel.qml`
+- `ModuleHost.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `NotepadPanel.qml`
+- `ClipboardPanel.qml`
+- `ProcessPanel.qml`
+- `widgets/Notepad.qml`
+- `widgets/Clipboard.qml`
+- `widgets/Processes.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added standalone notepad, clipboard history, and process-list popovers, each triggered by its own bar module rather than being embedded into the dashboard.
+- Added lazy bar widgets for `notepad`, `clipboard`, and `processes`, with aliases and module metadata in the existing module registry.
+- Added `openNotepad`, `openClipboard`, and `openProcesses` IPC commands.
+- Added notepad autosave to a configurable local path, defaulting to `${XDG_STATE_HOME:-$HOME/.local/state}/calypso/notepad.txt`.
+- Added cliphist-backed clipboard history with real image thumbnail extraction for image entries, plus a guarded CopyQ fallback.
+- Added process sorting by CPU or memory and temperature reporting; temperature shows unavailable because `sensors` is not installed on this system.
+- Added Settings Panel controls for notepad path/debounce, clipboard backend/item count, and process list poll interval/row count/panel width.
+- Added a dashboard CPU-row handoff that opens the process popover as its own surface; normal module popups remain handled by `ModuleDetailsPanel.qml`.
+
+### Decisions Made
+
+- Kept the new popover modules disabled by default so the user's existing bar layout is unchanged.
+- Preferred `cliphist` over CopyQ in `clipboardBackend: "auto"` because `copyq count` can block when the daemon is not ready on this session.
+- Kept process polling open-only and configurable through `polling.processListMs`.
+- Did not add a temperature dependency because `sensors` is not installed; this needs a flake/system dependency before live temperatures can be shown.
+
+### Verification
+
+- Confirmed `copyq`, `cliphist`, `wl-copy`, and `wl-paste` are installed; confirmed `sensors` is not installed.
+- Seeded cliphist with a text item and the provided PNG test image; verified `cliphist decode` produced `/run/user/1000/calypso-clipboard/2.png`.
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Current Quickshell instance `yo3gudfit` loaded successfully on PID `4786`.
+- Captured notepad screenshot at `/tmp/calypso-phase4-notepad-current.png`.
+- Captured clipboard screenshot at `/tmp/calypso-phase4-clipboard-current.png`; it shows cliphist text history and a real PNG thumbnail.
+- Captured process-list screenshot at `/tmp/calypso-phase4-processes-current.png`; it shows CPU/memory sorting and `Temp Unavailable`.
+- Attempted `ydotool` actual clicks earlier in this session, but virtual clicks did not reach Niri despite the daemon/socket being present; panel motion was therefore triggered through IPC for recording.
+- Recorded cropped motion clips with `wf-recorder`: `/tmp/calypso-phase4-notepad-motion-current.mp4`, `/tmp/calypso-phase4-clipboard-motion-current.mp4`, and `/tmp/calypso-phase4-processes-motion-current.mp4`.
+- Reviewed contact sheets: `/tmp/calypso-phase4-notepad-motion-current-contact.png`, `/tmp/calypso-phase4-clipboard-motion-current-contact.png`, and `/tmp/calypso-phase4-processes-motion-current-contact.png`; all surfaces were framed and opened smoothly from the bar edge.
+- Recorded reduce-motion notepad check at `/tmp/calypso-phase4-notepad-reduce-motion-current.mp4`; reviewed `/tmp/calypso-phase4-notepad-reduce-motion-current-contact.png` and confirmed the transition collapses to a near-instant appearance.
+- Notepad open idle sample on PID `4786`: `0.850s` CPU time over `60.021s`, `1.416%` of one core.
+- Clipboard open idle sample on PID `4786`: `1.080s` CPU time over `60.023s`, `1.799%` of one core.
+- Processes open idle sample on PID `4786`: `1.510s` CPU time over `60.041s`, `2.515%` of one core.
+- Final log window had no Calypso/QML warnings or errors.

@@ -348,6 +348,9 @@ PopupWindow {
         if (page === "focusedWindow") return focusedWindowDetail;
         if (page === "workspaces") return workspaceDetail;
         if (page === "powerProfile") return powerProfileDetail;
+        if (page === "notepad") return notepadDetail;
+        if (page === "clipboard") return clipboardDetail;
+        if (page === "processes") return processesDetail;
         if (page === "tray") return trayDetail;
         return genericDetail;
     }
@@ -1257,6 +1260,20 @@ PopupWindow {
                 width: parent.width
                 theme: root.theme
                 settings: root.settings
+                title: "Standalone popovers"
+
+                TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Notepad file"; value: settings.notepadFilePath; onTextRequested: function(text) { settings.setString("notepadFilePath", text); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Notepad save"; value: settings.notepadAutosaveMs; minimum: 250; maximum: 3000; step: 50; suffix: "ms"; onValueRequested: function(value) { settings.setNumber("notepadAutosaveMs", value, minimum, maximum); } }
+                ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Clipboard backend"; value: settings.clipboardBackend; choices: ["auto", "cliphist", "copyq"]; onChoiceRequested: function(choice) { settings.setEnum("clipboardBackend", choice, choices, "auto"); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Clipboard items"; value: settings.clipboardMaxItems; minimum: 5; maximum: 60; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("clipboardMaxItems", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Process polling"; value: settings.processListPollMs; minimum: 2000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("processListMs", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Process rows"; value: settings.processListLimit; minimum: 6; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("processListLimit", value, minimum, maximum); } }
+            }
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
                 title: "System"
 
                 ChoiceRow {
@@ -1400,6 +1417,39 @@ PopupWindow {
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Enabled"; checked: settings.enabled("powerProfile"); onToggled: function(checked) { settings.setModuleEnabled("powerProfile", checked); } }
             ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Show label"; checked: settings.powerProfileShowLabel; onToggled: function(checked) { settings.setValue("powerProfileShowLabel", checked); } }
             SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Polling"; value: settings.powerProfilePollMs; minimum: 10000; maximum: 120000; step: 5000; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("powerProfileMs", value, minimum, maximum); } }
+        }
+    }
+
+    Component {
+        id: notepadDetail
+        WidgetDetailBase {
+            moduleName: "notepad"
+            ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Enabled"; checked: settings.enabled("notepad"); onToggled: function(checked) { settings.setModuleEnabled("notepad", checked); } }
+            TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "File path"; value: settings.notepadFilePath; onTextRequested: function(text) { settings.setString("notepadFilePath", text); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Autosave"; value: settings.notepadAutosaveMs; minimum: 250; maximum: 3000; step: 50; suffix: "ms"; onValueRequested: function(value) { settings.setNumber("notepadAutosaveMs", value, minimum, maximum); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.notepadPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("notepadPanelWidth", value, minimum, maximum); } }
+        }
+    }
+
+    Component {
+        id: clipboardDetail
+        WidgetDetailBase {
+            moduleName: "clipboard"
+            ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Enabled"; checked: settings.enabled("clipboard"); onToggled: function(checked) { settings.setModuleEnabled("clipboard", checked); } }
+            ChoiceRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Backend"; value: settings.clipboardBackend; choices: ["auto", "cliphist", "copyq"]; onChoiceRequested: function(choice) { settings.setEnum("clipboardBackend", choice, choices, "auto"); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Items"; value: settings.clipboardMaxItems; minimum: 5; maximum: 60; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("clipboardMaxItems", value, minimum, maximum); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.clipboardPanelWidth; minimum: 340; maximum: 760; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("clipboardPanelWidth", value, minimum, maximum); } }
+        }
+    }
+
+    Component {
+        id: processesDetail
+        WidgetDetailBase {
+            moduleName: "processes"
+            ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Enabled"; checked: settings.enabled("processes"); onToggled: function(checked) { settings.setModuleEnabled("processes", checked); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Polling"; value: settings.processListPollMs; minimum: 2000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("processListMs", value, minimum, maximum); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Rows"; value: settings.processListLimit; minimum: 6; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("processListLimit", value, minimum, maximum); } }
+            SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.processPanelWidth; minimum: 380; maximum: 820; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("processPanelWidth", value, minimum, maximum); } }
         }
     }
 

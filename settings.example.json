@@ -18,6 +18,9 @@
     "caffeine",
     "clock",
     "dashboard",
+    "notepad",
+    "clipboard",
+    "processes",
     "tray",
     "settings"
   ],
@@ -97,6 +100,14 @@
     "network",
     "battery"
   ],
+  "notepadPanelWidth": 420,
+  "notepadFilePath": "",
+  "notepadAutosaveMs": 600,
+  "clipboardPanelWidth": 460,
+  "clipboardBackend": "auto",
+  "clipboardMaxItems": 20,
+  "processPanelWidth": 520,
+  "processListLimit": 12,
   "memoryShowGraph": false,
   "modulePopupDefaultTab": "Overview",
   "modulePopupHistorySamples": 24,
@@ -318,6 +329,59 @@
       "label": "Dashboard"
     },
     {
+      "aliases": [
+        "scratchpad",
+        "notes"
+      ],
+      "capabilities": [
+        "autosave"
+      ],
+      "category": "Shell",
+      "configurable": true,
+      "cost": "lazy",
+      "defaultSection": "right",
+      "defaultVisible": false,
+      "icon": "󰎞",
+      "id": "notepad",
+      "label": "Notepad"
+    },
+    {
+      "aliases": [
+        "cliphist",
+        "clip"
+      ],
+      "capabilities": [
+        "history",
+        "images"
+      ],
+      "category": "Shell",
+      "configurable": true,
+      "cost": "open polling",
+      "defaultSection": "right",
+      "defaultVisible": false,
+      "icon": "󰅌",
+      "id": "clipboard",
+      "label": "Clipboard"
+    },
+    {
+      "aliases": [
+        "processList",
+        "tasks"
+      ],
+      "capabilities": [
+        "sort",
+        "temperature"
+      ],
+      "category": "System",
+      "configurable": true,
+      "cost": "open polling",
+      "defaultSection": "right",
+      "defaultVisible": false,
+      "icon": "󰒋",
+      "id": "processes",
+      "label": "Processes"
+    },
+    {
       "aliases": [],
       "capabilities": [],
       "category": "System",
@@ -338,6 +402,9 @@
     "caffeine": false,
     "clock": false,
     "dashboard": true,
+    "notepad": false,
+    "clipboard": false,
+    "processes": false,
     "cpu": true,
     "focusedWindow": true,
     "media": true,
@@ -385,6 +452,7 @@
     "cpuMs": 13000,
     "dashboardMediaMs": 500,
     "dashboardStateMs": 5000,
+    "processListMs": 5000,
     "mediaMs": 2000,
     "memoryMs": 5000,
     "networkMs": 5000,

@@ -624,6 +624,14 @@ Item {
     property bool dashboardGrowFromTrigger: adapter.dashboardGrowFromTrigger
     property var dashboardQuickToggles: adapter.dashboardQuickToggles
     property var dashboardPerformanceModules: adapter.dashboardPerformanceModules
+    property int notepadPanelWidth: adapter.notepadPanelWidth
+    property string notepadFilePath: adapter.notepadFilePath
+    property int notepadAutosaveMs: adapter.notepadAutosaveMs
+    property int clipboardPanelWidth: adapter.clipboardPanelWidth
+    property string clipboardBackend: adapter.clipboardBackend
+    property int clipboardMaxItems: adapter.clipboardMaxItems
+    property int processPanelWidth: adapter.processPanelWidth
+    property int processListLimit: adapter.processListLimit
     property bool trayCompact: adapter.trayCompact
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
@@ -677,6 +685,7 @@ Item {
     property int mediaPollMs: pollInterval("mediaMs", 2000)
     property int dashboardMediaPollMs: pollInterval("dashboardMediaMs", 500)
     property int dashboardStatePollMs: pollInterval("dashboardStateMs", 5000)
+    property int processListPollMs: pollInterval("processListMs", 5000)
     property int batteryFallbackPollMs: pollInterval("batteryFallbackMs", 30000)
     property int clockPollMs: pollInterval("clockMs", 1000)
     property int brightnessPollMs: pollInterval("brightnessMs", 15000)
@@ -815,6 +824,14 @@ Item {
             property bool dashboardGrowFromTrigger: true
             property var dashboardQuickToggles: ["wifi", "bluetooth", "mic", "dnd"]
             property var dashboardPerformanceModules: ["cpu", "memory", "network", "battery"]
+            property int notepadPanelWidth: 420
+            property string notepadFilePath: ""
+            property int notepadAutosaveMs: 600
+            property int clipboardPanelWidth: 460
+            property string clipboardBackend: "auto"
+            property int clipboardMaxItems: 20
+            property int processPanelWidth: 520
+            property int processListLimit: 12
             property bool trayCompact: true
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true
@@ -871,9 +888,12 @@ Item {
                 { "id": "caffeine", "label": "Caffeine", "icon": "󰅶", "category": "Controls", "aliases": ["idleInhibitor", "idle"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "local", "capabilities": [] },
                 { "id": "clock", "label": "Clock", "icon": "󰥔", "category": "Shell", "aliases": ["time"], "defaultSection": "right", "defaultVisible": true, "configurable": true, "cost": "timer", "capabilities": [] },
                 { "id": "dashboard", "label": "Dashboard", "icon": "󰒓", "category": "Shell", "aliases": ["controls", "controlCenter", "quickControls"], "defaultSection": "right", "defaultVisible": false, "configurable": false, "cost": "lazy", "capabilities": [] },
+                { "id": "notepad", "label": "Notepad", "icon": "󰎞", "category": "Shell", "aliases": ["scratchpad", "notes"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "lazy", "capabilities": ["autosave"] },
+                { "id": "clipboard", "label": "Clipboard", "icon": "󰅌", "category": "Shell", "aliases": ["cliphist", "clip"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["history", "images"] },
+                { "id": "processes", "label": "Processes", "icon": "󰒋", "category": "System", "aliases": ["processList", "tasks"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["sort", "temperature"] },
                 { "id": "tray", "label": "Tray", "icon": "󰒲", "category": "System", "aliases": [], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "event", "capabilities": [] }
             ]
-            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "dashboard", "tray", "settings"]
+            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "dashboard", "notepad", "clipboard", "processes", "tray", "settings"]
             property var leftModules: ["workspaces", "media"]
             property var centerModules: ["clock"]
             property var rightModules: ["audio", "network", "battery", "cpu", "memory", "tray", "settings"]
@@ -892,6 +912,9 @@ Item {
                 "caffeine": false,
                 "clock": true,
                 "dashboard": false,
+                "notepad": false,
+                "clipboard": false,
+                "processes": false,
                 "tray": false
             })
             property var polling: ({
@@ -901,6 +924,7 @@ Item {
                 "mediaMs": 2000,
                 "dashboardMediaMs": 500,
                 "dashboardStateMs": 5000,
+                "processListMs": 5000,
                 "batteryFallbackMs": 30000,
                 "clockMs": 1000,
                 "brightnessMs": 15000,

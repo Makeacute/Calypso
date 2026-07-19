@@ -113,6 +113,9 @@ Widget options:
 - `modulePopupShowGauge`, `modulePopupShowSparkline`, `modulePopupHistorySamples`, `modulePopupNetworkScaleKib`
 - `dashboardPanelWidth`, `dashboardShowMedia`, `dashboardShowWeather`, `dashboardGrowFromTrigger`
 - `dashboardQuickToggles`, `dashboardPerformanceModules`, `polling.dashboardMediaMs`, `polling.dashboardStateMs`
+- `notepadPanelWidth`, `notepadFilePath`, `notepadAutosaveMs`
+- `clipboardPanelWidth`, `clipboardBackend`, `clipboardMaxItems`
+- `processPanelWidth`, `processListLimit`, `polling.processListMs`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`
@@ -138,6 +141,7 @@ Polling:
 - `polling.clockMs`
 - `polling.brightnessMs`
 - `polling.powerProfileMs`
+- `polling.processListMs`
 
 ## Verification
 

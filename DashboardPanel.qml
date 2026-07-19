@@ -35,6 +35,8 @@ PopupWindow {
     property real triggerScale: 0.18
     readonly property int panelWidth: settings ? Math.round(Math.min(panelWindow ? panelWindow.width : settings.dashboardPanelWidth, Math.max(settings.effectiveSpacingXL * 16, settings.dashboardPanelWidth))) : 420
 
+    signal processesRequested(var anchorItem)
+
     function shellQuote(value) {
         return "'" + String(value || "").replace(/'/g, "'\\''") + "'";
     }
@@ -523,7 +525,10 @@ PopupWindow {
                         settings: root.settings
                         moduleName: String(modelData)
                         selected: root.selectedModule === moduleName
-                        onPressed: root.selectedModule = moduleName
+                        onPressed: function(anchorItem) {
+                            if (moduleName === "cpu") root.processesRequested(anchorItem);
+                            else root.selectedModule = moduleName;
+                        }
                     }
                 }
             }
@@ -631,7 +636,7 @@ PopupWindow {
         property bool active: false
         property bool available: false
 
-        signal pressed()
+        signal pressed(var anchorItem)
 
         implicitHeight: settings.controlHeight
         radius: settings.effectivePillRadius
@@ -878,7 +883,7 @@ PopupWindow {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: row.pressed()
+            onClicked: row.pressed(row)
         }
     }
 
