@@ -1,0 +1,11 @@
+settings.json
+*.log
+*.qslog
+.direnv/
+result
+result-*
+perf-reports/
+.qmlls.ini
+*.bak
+.agents/
+.codex/

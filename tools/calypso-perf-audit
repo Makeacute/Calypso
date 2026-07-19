@@ -1,0 +1,413 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+duration=120
+interval=5
+pid=""
+output_base="$repo_dir/perf-reports"
+log_lines=300
+run_qmllint=1
+
+usage() {
+    cat <<'EOF'
+Usage: tools/calypso-perf-audit [options]
+
+Options:
+  --pid PID          Quickshell PID to sample.
+  --duration SEC    Total sample duration. Default: 120.
+  --interval SEC    Sample interval. Default: 5.
+  --output DIR      Directory that will receive timestamped reports.
+                    Default: ./perf-reports.
+  --log-lines N     Journal lines to copy into the report. Default: 300.
+  --no-qmllint      Skip qmllint collection.
+  -h, --help        Show this help.
+
+The audit is read-only for the Quickshell config: it snapshots settings.json,
+samples /proc, copies journal tails when available, and writes a report folder.
+It does not reload Quickshell and does not toggle modules.
+EOF
+}
+
+die() {
+    printf 'calypso-perf-audit: %s\n' "$*" >&2
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pid)
+            [[ $# -ge 2 ]] || die "--pid requires a value"
+            pid="$2"
+            shift 2
+            ;;
+        --duration)
+            [[ $# -ge 2 ]] || die "--duration requires a value"
+            duration="$2"
+            shift 2
+            ;;
+        --interval)
+            [[ $# -ge 2 ]] || die "--interval requires a value"
+            interval="$2"
+            shift 2
+            ;;
+        --output)
+            [[ $# -ge 2 ]] || die "--output requires a value"
+            output_base="$2"
+            shift 2
+            ;;
+        --log-lines)
+            [[ $# -ge 2 ]] || die "--log-lines requires a value"
+            log_lines="$2"
+            shift 2
+            ;;
+        --no-qmllint)
+            run_qmllint=0
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            die "unknown option: $1"
+            ;;
+    esac
+done
+
+[[ "$duration" =~ ^[0-9]+$ ]] || die "--duration must be a positive integer"
+[[ "$interval" =~ ^[0-9]+$ ]] || die "--interval must be a positive integer"
+[[ "$log_lines" =~ ^[0-9]+$ ]] || die "--log-lines must be a positive integer"
+(( duration > 0 )) || die "--duration must be greater than zero"
+(( interval > 0 )) || die "--interval must be greater than zero"
+
+cmdline_for() {
+    tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null | sed 's/[[:space:]]*$//'
+}
+
+cwd_for() {
+    readlink "/proc/$1/cwd" 2>/dev/null || true
+}
+
+candidate_pids() {
+    if command -v pgrep >/dev/null 2>&1; then
+        pgrep -u "${USER:-$(id -un)}" -f 'quickshell|\.quickshell-wrapped' 2>/dev/null || true
+    else
+        for proc in /proc/[0-9]*; do
+            local candidate="${proc##*/}"
+            local line
+            line="$(cmdline_for "$candidate")"
+            [[ "$line" == *quickshell* ]] && printf '%s\n' "$candidate"
+        done
+    fi
+}
+
+choose_pid() {
+    local candidates=()
+    local candidate
+    while IFS= read -r candidate; do
+        [[ -n "$candidate" && -r "/proc/$candidate/stat" ]] && candidates+=("$candidate")
+    done < <(candidate_pids | sort -n | uniq)
+
+    local current_cmd
+    local current_cwd
+
+    for candidate in "${candidates[@]}"; do
+        current_cmd="$(cmdline_for "$candidate")"
+        [[ "$current_cmd" == *"$repo_dir"* ]] && {
+            printf '%s\n' "$candidate"
+            return 0
+        }
+    done
+
+    for candidate in "${candidates[@]}"; do
+        current_cmd="$(cmdline_for "$candidate")"
+        current_cwd="$(cwd_for "$candidate")"
+        [[ "$current_cwd" == "$repo_dir" && "$current_cmd" != *"--path "* ]] && {
+            printf '%s\n' "$candidate"
+            return 0
+        }
+    done
+
+    for candidate in "${candidates[@]}"; do
+        current_cwd="$(cwd_for "$candidate")"
+        [[ "$current_cwd" == "$repo_dir" ]] && {
+            printf '%s\n' "$candidate"
+            return 0
+        }
+    done
+
+    [[ ${#candidates[@]} -gt 0 ]] || return 1
+    printf '%s\n' "${candidates[-1]}"
+}
+
+if [[ -z "$pid" ]]; then
+    pid="$(choose_pid)" || die "no Quickshell process found; pass --pid after starting Calypso"
+fi
+
+[[ "$pid" =~ ^[0-9]+$ ]] || die "--pid must be numeric"
+[[ -r "/proc/$pid/stat" ]] || die "PID $pid is not readable"
+
+timestamp="$(date +%Y%m%d-%H%M%S)"
+report_dir="$output_base/calypso-$timestamp"
+mkdir -p "$report_dir"
+
+read_ticks_from_stat() {
+    local stat_file="$1"
+    local stat
+    stat="$(<"$stat_file")" || return 1
+    local rest="${stat##*) }"
+    set -- $rest
+    local utime="${12:-0}"
+    local stime="${13:-0}"
+    printf '%s\n' "$((utime + stime))"
+}
+
+read_ticks() {
+    read_ticks_from_stat "/proc/$1/stat"
+}
+
+status_value() {
+    local key="$1"
+    awk -v key="$key:" '$1 == key { print $2; exit }' "/proc/$pid/status" 2>/dev/null || true
+}
+
+fd_count() {
+    ls -1 "/proc/$pid/fd" 2>/dev/null | wc -l | tr -d ' '
+}
+
+child_pids() {
+    if command -v pgrep >/dev/null 2>&1; then
+        pgrep -P "$pid" 2>/dev/null | paste -sd ';' - || true
+    fi
+}
+
+safe_text() {
+    tr '\t\n' '  ' | sed 's/[[:space:]]*$//'
+}
+
+write_thread_ticks() {
+    local output="$1"
+    printf 'tid\tname\tticks\n' >"$output"
+
+    local task
+    for task in /proc/"$pid"/task/[0-9]*; do
+        [[ -r "$task/stat" ]] || continue
+        local tid="${task##*/}"
+        local name
+        local ticks
+        name="$(safe_text <"$task/comm" 2>/dev/null || printf 'unknown')"
+        ticks="$(read_ticks_from_stat "$task/stat" 2>/dev/null || printf '0')"
+        printf '%s\t%s\t%s\n' "$tid" "$name" "$ticks" >>"$output"
+    done
+}
+
+write_process_snapshot() {
+    {
+        printf 'Calypso performance audit\n'
+        printf 'captured_at\t%s\n' "$(date -Is)"
+        printf 'repo\t%s\n' "$repo_dir"
+        printf 'pid\t%s\n' "$pid"
+        printf 'cmdline\t%s\n' "$(cmdline_for "$pid")"
+        printf 'cwd\t%s\n' "$(cwd_for "$pid")"
+        printf 'kernel\t%s\n' "$(uname -a)"
+        printf 'duration_s\t%s\n' "$duration"
+        printf 'interval_s\t%s\n' "$interval"
+        printf 'clk_tck\t%s\n' "$(getconf CLK_TCK)"
+        printf 'cpu_count\t%s\n' "$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 'unknown')"
+        printf 'rss_kb\t%s\n' "$(status_value VmRSS)"
+        printf 'threads\t%s\n' "$(status_value Threads)"
+        printf 'fds\t%s\n' "$(fd_count)"
+        printf 'children\t%s\n' "$(child_pids)"
+    } >"$report_dir/process-summary.tsv"
+
+    cp "/proc/$pid/status" "$report_dir/proc-status.txt" 2>/dev/null || true
+
+    if command -v pgrep >/dev/null 2>&1; then
+        {
+            while IFS= read -r child; do
+                [[ -n "$child" ]] || continue
+                printf '%s\t%s\n' "$child" "$(cmdline_for "$child")"
+            done < <(pgrep -P "$pid" 2>/dev/null || true)
+        } >"$report_dir/children.tsv"
+    fi
+
+    if command -v pstree >/dev/null 2>&1; then
+        pstree -ap "$pid" >"$report_dir/pstree.txt" 2>&1 || true
+    fi
+}
+
+write_settings_snapshot() {
+    cp "$repo_dir/settings.json" "$report_dir/settings.json"
+
+    if command -v jq >/dev/null 2>&1; then
+        if jq . "$repo_dir/settings.json" >"$report_dir/settings.normalized.json" 2>"$report_dir/json-validation.txt"; then
+            printf 'settings.json: valid via jq\n' >"$report_dir/json-validation.txt"
+            jq -r '
+                "leftModules: " + (.leftModules | join(", ")),
+                "centerModules: " + (.centerModules | join(", ")),
+                "rightModules: " + (.rightModules | join(", ")),
+                "performanceMode: " + ((.performanceMode // false) | tostring),
+                "reduceMotion: " + ((.reduceMotion // false) | tostring),
+                "moduleVisibility:",
+                (.moduleVisibility | to_entries[] | "  \(.key): \(.value)"),
+                "polling:",
+                (.polling | to_entries[] | "  \(.key): \(.value)ms")
+            ' "$repo_dir/settings.json" >"$report_dir/settings-summary.txt"
+        else
+            sed -i '1s/^/settings.json: invalid via jq\n/' "$report_dir/json-validation.txt"
+            printf 'settings summary skipped because settings.json is invalid\n' >"$report_dir/settings-summary.txt"
+        fi
+    elif command -v python3 >/dev/null 2>&1; then
+        if python3 -m json.tool "$repo_dir/settings.json" >"$report_dir/settings.normalized.json" 2>"$report_dir/json-validation.txt"; then
+            printf 'settings.json: valid via python3 json.tool\n' >"$report_dir/json-validation.txt"
+            python3 - "$repo_dir/settings.json" >"$report_dir/settings-summary.txt" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+for key in ("leftModules", "centerModules", "rightModules"):
+    print(f"{key}: {', '.join(data.get(key, []))}")
+
+print(f"performanceMode: {data.get('performanceMode', False)}")
+print(f"reduceMotion: {data.get('reduceMotion', False)}")
+print("moduleVisibility:")
+for key, value in sorted(data.get("moduleVisibility", {}).items()):
+    print(f"  {key}: {value}")
+print("polling:")
+for key, value in sorted(data.get("polling", {}).items()):
+    print(f"  {key}: {value}ms")
+PY
+        else
+            sed -i '1s/^/settings.json: invalid via python3 json.tool\n/' "$report_dir/json-validation.txt"
+            printf 'settings summary skipped because settings.json is invalid\n' >"$report_dir/settings-summary.txt"
+        fi
+    else
+        printf 'settings.json: validation skipped; jq/python3 not found\n' >"$report_dir/json-validation.txt"
+    fi
+}
+
+write_logs() {
+    if command -v journalctl >/dev/null 2>&1; then
+        journalctl --user --no-pager -n "$log_lines" >"$report_dir/user-journal-tail.txt" 2>&1 || true
+        journalctl --user --no-pager _COMM=quickshell -n "$log_lines" >"$report_dir/quickshell-journal-tail.txt" 2>&1 || true
+    else
+        printf 'journalctl not found\n' >"$report_dir/user-journal-tail.txt"
+    fi
+}
+
+write_qmllint() {
+    if (( run_qmllint == 0 )); then
+        printf 'qmllint skipped by --no-qmllint\n' >"$report_dir/qmllint.txt"
+        return
+    fi
+
+    if ! command -v qmllint >/dev/null 2>&1; then
+        printf 'qmllint not found\n' >"$report_dir/qmllint.txt"
+        return
+    fi
+
+    (
+        cd "$repo_dir"
+        mapfile -t qml_files < <(find . -type f -name '*.qml' | sort)
+        qmllint "${qml_files[@]}"
+    ) >"$report_dir/qmllint.txt" 2>&1 || true
+}
+
+sample_process() {
+    local clk_tck
+    clk_tck="$(getconf CLK_TCK)"
+
+    local start_time
+    local last_time
+    local now
+    local elapsed
+    local start_ticks
+    local last_ticks
+    local ticks
+    local delta_ticks
+    local delta_time
+    local cpu_percent
+    local rss
+    local threads
+    local fds
+    local children
+
+    start_time="$(date +%s)"
+    last_time="$start_time"
+    start_ticks="$(read_ticks "$pid")"
+    last_ticks="$start_ticks"
+
+    write_thread_ticks "$report_dir/threads-start.tsv"
+
+    printf 'timestamp\telapsed_s\tcpu_percent_one_core\trss_kb\tthreads\tfds\tchild_pids\n' >"$report_dir/samples.tsv"
+
+    while :; do
+        sleep "$interval"
+
+        [[ -r "/proc/$pid/stat" ]] || {
+            printf 'process exited before sampling completed\n' >"$report_dir/sample-warning.txt"
+            break
+        }
+
+        now="$(date +%s)"
+        elapsed="$((now - start_time))"
+        ticks="$(read_ticks "$pid")"
+        delta_ticks="$((ticks - last_ticks))"
+        delta_time="$((now - last_time))"
+        (( delta_time > 0 )) || delta_time=1
+        cpu_percent="$(awk -v ticks="$delta_ticks" -v hz="$clk_tck" -v sec="$delta_time" 'BEGIN { printf "%.3f", (ticks / hz / sec) * 100 }')"
+        rss="$(status_value VmRSS)"
+        threads="$(status_value Threads)"
+        fds="$(fd_count)"
+        children="$(child_pids)"
+
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$elapsed" "$cpu_percent" "$rss" "$threads" "$fds" "$children" >>"$report_dir/samples.tsv"
+
+        last_time="$now"
+        last_ticks="$ticks"
+        (( elapsed >= duration )) && break
+    done
+
+    local end_time
+    local end_ticks
+    local actual_duration
+    local total_delta
+    local average_cpu
+
+    end_time="$(date +%s)"
+    actual_duration="$((end_time - start_time))"
+    (( actual_duration > 0 )) || actual_duration=1
+    end_ticks="$(read_ticks "$pid" 2>/dev/null || printf '%s' "$last_ticks")"
+    total_delta="$((end_ticks - start_ticks))"
+    average_cpu="$(awk -v ticks="$total_delta" -v hz="$clk_tck" -v sec="$actual_duration" 'BEGIN { printf "%.3f", (ticks / hz / sec) * 100 }')"
+
+    write_thread_ticks "$report_dir/threads-end.tsv"
+    awk -F '\t' -v hz="$clk_tck" -v sec="$actual_duration" '
+        NR == FNR { if (FNR > 1) start[$1] = $3; next }
+        FNR == 1 { print "tid\tname\tcpu_percent_one_core\tdelta_ticks"; next }
+        {
+            delta = $3 - start[$1]
+            if (delta < 0) delta = 0
+            printf "%s\t%s\t%.3f\t%s\n", $1, $2, (delta / hz / sec) * 100, delta
+        }
+    ' "$report_dir/threads-start.tsv" "$report_dir/threads-end.tsv" >"$report_dir/threads.tsv"
+
+    {
+        printf 'actual_duration_s\t%s\n' "$actual_duration"
+        printf 'average_cpu_percent_one_core\t%s\n' "$average_cpu"
+        printf 'start_ticks\t%s\n' "$start_ticks"
+        printf 'end_ticks\t%s\n' "$end_ticks"
+        printf 'delta_ticks\t%s\n' "$total_delta"
+    } >"$report_dir/sample-summary.tsv"
+}
+
+write_process_snapshot
+write_settings_snapshot
+write_logs
+write_qmllint
+sample_process
+
+printf '%s\n' "$report_dir"
