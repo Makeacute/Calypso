@@ -18,6 +18,7 @@
     "caffeine",
     "clock",
     "dashboard",
+    "launcher",
     "notepad",
     "clipboard",
     "processes",
@@ -330,6 +331,24 @@
     },
     {
       "aliases": [
+        "apps",
+        "appLauncher"
+      ],
+      "capabilities": [
+        "desktopEntries",
+        "fuzzySearch"
+      ],
+      "category": "Shell",
+      "configurable": true,
+      "cost": "lazy",
+      "defaultSection": "right",
+      "defaultVisible": false,
+      "icon": "󰀻",
+      "id": "launcher",
+      "label": "Launcher"
+    },
+    {
+      "aliases": [
         "scratchpad",
         "notes"
       ],
@@ -402,6 +421,7 @@
     "caffeine": false,
     "clock": false,
     "dashboard": true,
+    "launcher": false,
     "notepad": false,
     "clipboard": false,
     "processes": false,
@@ -425,6 +445,8 @@
   "motionSpatial": 275,
   "networkInterfaceName": "",
   "networkShowSpeed": false,
+  "launcherMaxResults": 12,
+  "launcherPanelWidth": 520,
   "notificationsGroupByApp": true,
   "notificationsGroupsExpanded": true,
   "notificationsMaxVisible": 24,

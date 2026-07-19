@@ -586,3 +586,55 @@ Date: 2026-07-19
 - Post-update idle sample on PID `4786`: `0.280s` CPU over `15.000s`, `1.867%` of one core.
 - Confirmed final audio volume was restored to `0.15`.
 - Final log window had no Calypso/QML warnings or errors.
+
+## Phase 7 App Launcher
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `ModuleHost.qml`
+- `LauncherPanel.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `widgets/Launcher.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added a lazy-loaded app launcher surface backed by Quickshell desktop entries.
+- Added a `launcher` bar module that opens the launcher as its own module/popup rather than replacing existing module popups.
+- Added fuzzy desktop-entry search across app name, generic name, comment, keywords, and categories.
+- Rendered launcher results with system theme app icons through `AppIconImage`, with token-styled initial fallbacks only when an app icon is unavailable.
+- Added `launcherPanelWidth` and `launcherMaxResults` settings with Settings panel controls and `settings.example.json` defaults.
+- Added `openLauncher`, `openLauncherQuery`, and `closeLauncher` IPC helpers for keybinds and verification.
+
+### Bugs Fixed
+
+- Fixed bottom-bar launcher placement so the popup opens above the bar instead of being clipped off the bottom edge.
+
+### Decisions Made
+
+- Kept the launcher disabled by default in `moduleVisibility`; users can add it to a bar section like any other module.
+- Kept search local to Quickshell desktop entries instead of adding a fuzzy-search dependency.
+- Kept launcher loading in Phase 3 interaction loaders so it does not affect first paint.
+- Used IPC-triggered search for verification because ydotool still did not reliably deliver keyboard input to the Niri popup in this session.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured launcher-open screenshot at `/tmp/calypso-phase7-launcher-open-final.png`.
+- Captured filtered search screenshot at `/tmp/calypso-phase7-launcher-search-copy-ipc.png`; `CopyQ` ranked first for `copy`.
+- Captured final post-cleanup launcher screenshot at `/tmp/calypso-phase7-launcher-final-after-token-cleanup.png`.
+- Captured layout matrix across `barStyle` `islands`/`solid`/`pill` and `barPosition` `top`/`bottom`; top captures are `/tmp/calypso-phase7-layout-top-islands.png`, `/tmp/calypso-phase7-layout-top-solid.png`, and `/tmp/calypso-phase7-layout-top-pill.png`.
+- Found bottom-position clipping in the first matrix, fixed it, then recaptured `/tmp/calypso-phase7-layout-bottom-islands-fixed.png`, `/tmp/calypso-phase7-layout-bottom-solid-fixed.png`, and `/tmp/calypso-phase7-layout-bottom-pill-fixed.png`.
+- Recorded launcher open motion at `/tmp/calypso-phase7-launcher-motion.mp4` and reduce-motion behavior at `/tmp/calypso-phase7-launcher-reduce-motion.mp4`.
+- Recorded fixed bottom-bar launcher motion at `/tmp/calypso-phase7-launcher-bottom-motion-fixed.mp4` with contact sheet `/tmp/calypso-phase7-launcher-bottom-motion-fixed-contact.png`.
+- Recorded fixed bottom-bar reduce-motion behavior at `/tmp/calypso-phase7-launcher-bottom-reduce-motion-fixed.mp4` with contact sheet `/tmp/calypso-phase7-launcher-bottom-reduce-motion-fixed-contact.png`; reduced motion collapsed the eased slide to the immediate visible state.
+- Final idle CPU sample with launcher closed on PID `4786`: `1.250s` CPU over `60.000s`, `2.083%` of one core.
+- Final idle CPU sample with launcher open and filtered on PID `4786`: `1.270s` CPU over `60.000s`, `2.117%` of one core.
+- Restored `settings.json` to `barStyle: solid`, `barPosition: top`, and `reduceMotion: false`.
+- Final log window had no Calypso/QML warnings or errors.

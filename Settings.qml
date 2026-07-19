@@ -639,6 +639,8 @@ Item {
     property bool notificationsShowBody: adapter.notificationsShowBody
     property bool notificationsShowImages: adapter.notificationsShowImages
     property bool notificationsShowActions: adapter.notificationsShowActions
+    property int launcherPanelWidth: adapter.launcherPanelWidth
+    property int launcherMaxResults: adapter.launcherMaxResults
     property bool trayCompact: adapter.trayCompact
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
@@ -846,6 +848,8 @@ Item {
             property bool notificationsShowBody: true
             property bool notificationsShowImages: true
             property bool notificationsShowActions: true
+            property int launcherPanelWidth: 520
+            property int launcherMaxResults: 12
             property bool trayCompact: true
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true
@@ -902,12 +906,13 @@ Item {
                 { "id": "caffeine", "label": "Caffeine", "icon": "󰅶", "category": "Controls", "aliases": ["idleInhibitor", "idle"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "local", "capabilities": [] },
                 { "id": "clock", "label": "Clock", "icon": "󰥔", "category": "Shell", "aliases": ["time"], "defaultSection": "right", "defaultVisible": true, "configurable": true, "cost": "timer", "capabilities": [] },
                 { "id": "dashboard", "label": "Dashboard", "icon": "󰒓", "category": "Shell", "aliases": ["controls", "controlCenter", "quickControls"], "defaultSection": "right", "defaultVisible": false, "configurable": false, "cost": "lazy", "capabilities": [] },
+                { "id": "launcher", "label": "Launcher", "icon": "󰀻", "category": "Shell", "aliases": ["apps", "appLauncher"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "lazy", "capabilities": ["desktopEntries", "fuzzySearch"] },
                 { "id": "notepad", "label": "Notepad", "icon": "󰎞", "category": "Shell", "aliases": ["scratchpad", "notes"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "lazy", "capabilities": ["autosave"] },
                 { "id": "clipboard", "label": "Clipboard", "icon": "󰅌", "category": "Shell", "aliases": ["cliphist", "clip"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["history", "images"] },
                 { "id": "processes", "label": "Processes", "icon": "󰒋", "category": "System", "aliases": ["processList", "tasks"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["sort", "temperature"] },
                 { "id": "tray", "label": "Tray", "icon": "󰒲", "category": "System", "aliases": [], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "event", "capabilities": [] }
             ]
-            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "dashboard", "notepad", "clipboard", "processes", "tray", "settings"]
+            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "dashboard", "launcher", "notepad", "clipboard", "processes", "tray", "settings"]
             property var leftModules: ["workspaces", "media"]
             property var centerModules: ["clock"]
             property var rightModules: ["audio", "network", "battery", "cpu", "memory", "tray", "settings"]
@@ -926,6 +931,7 @@ Item {
                 "caffeine": false,
                 "clock": true,
                 "dashboard": false,
+                "launcher": false,
                 "notepad": false,
                 "clipboard": false,
                 "processes": false,

@@ -81,6 +81,7 @@ Item {
         if (name === "caffeine" || name === "idleInhibitor" || name === "idle") return caffeineComponent;
         if (name === "clock" || name === "time") return clockComponent;
         if (name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard") return controlsComponent;
+        if (name === "launcher" || name === "apps" || name === "appLauncher") return launcherComponent;
         if (name === "notepad" || name === "scratchpad" || name === "notes") return notepadComponent;
         if (name === "clipboard" || name === "cliphist" || name === "clip") return clipboardComponent;
         if (name === "processes" || name === "processList" || name === "tasks") return processesComponent;
@@ -93,6 +94,7 @@ Item {
         if (name === "workspaces" || name === "focusedWindow" || name === "clock" || name === "time")
             return 1;
         if (name === "settings" || name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard"
+                || name === "launcher" || name === "apps" || name === "appLauncher"
                 || name === "notepad" || name === "scratchpad" || name === "notes"
                 || name === "clipboard" || name === "cliphist" || name === "clip"
                 || name === "processes" || name === "processList" || name === "tasks")
@@ -121,6 +123,7 @@ Item {
     Component { id: caffeineComponent; Caffeine { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; panelWindow: root.panelWindow } }
     Component { id: clockComponent; Clock { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onRequested: function(anchorItem) { root.clockRequested(anchorItem); } } }
     Component { id: controlsComponent; ControlCenterButton { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onRequested: function(anchorItem) { root.controlsRequested(anchorItem); } } }
+    Component { id: launcherComponent; Launcher { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
     Component { id: notepadComponent; Notepad { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
     Component { id: clipboardComponent; Clipboard { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
     Component { id: processesComponent; Processes { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }

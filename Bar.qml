@@ -48,6 +48,7 @@ PanelWindow {
         closeLoadedPanel(clipboardPanelLoader);
         closeLoadedPanel(processPanelLoader);
         closeLoadedPanel(notificationPanelLoader);
+        closeLoadedPanel(launcherPanelLoader);
     }
 
     function showSettings(anchorItem) {
@@ -69,6 +70,7 @@ PanelWindow {
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         closeLoadedPanel(processPanelLoader);
+        closeLoadedPanel(launcherPanelLoader);
         if (notificationPanelLoader.item)
             notificationPanelLoader.item.toggle(anchorItem);
     }
@@ -100,6 +102,7 @@ PanelWindow {
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         closeLoadedPanel(notificationPanelLoader);
+        closeLoadedPanel(launcherPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         closeLoadedPanel(processPanelLoader);
         if (notepadPanelLoader.item)
@@ -113,6 +116,7 @@ PanelWindow {
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         closeLoadedPanel(notificationPanelLoader);
+        closeLoadedPanel(launcherPanelLoader);
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(processPanelLoader);
         if (clipboardPanelLoader.item)
@@ -125,6 +129,7 @@ PanelWindow {
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         closeLoadedPanel(notificationPanelLoader);
+        closeLoadedPanel(launcherPanelLoader);
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         if (processPanelLoader.item)
@@ -132,8 +137,40 @@ PanelWindow {
         closeLoadedPanel(dashboardPanelLoader);
     }
 
+    function showLauncher(anchorItem) {
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
+        if (launcherPanelLoader.item)
+            launcherPanelLoader.item.toggle(anchorItem);
+    }
+
+    function showLauncherQuery(query) {
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
+        if (launcherPanelLoader.item)
+            launcherPanelLoader.item.openQuery(query);
+    }
+
     function showModuleDetails(moduleName, anchorItem) {
         const name = String(moduleName || "");
+        if (name === "launcher" || name === "apps" || name === "appLauncher") {
+            showLauncher(anchorItem);
+            return;
+        }
         if (name === "notepad" || name === "scratchpad" || name === "notes") {
             showNotepad(anchorItem);
             return;
@@ -168,6 +205,10 @@ PanelWindow {
 
     function openModuleDetails(moduleName) {
         const name = String(moduleName || "");
+        if (name === "launcher" || name === "apps" || name === "appLauncher") {
+            showLauncher(null);
+            return;
+        }
         if (name === "notepad" || name === "scratchpad" || name === "notes") {
             showNotepad(null);
             return;
@@ -255,6 +296,18 @@ PanelWindow {
 
         function closeProcesses(): void {
             bar.closeLoadedPanel(processPanelLoader);
+        }
+
+        function openLauncher(): void {
+            bar.showLauncher(null);
+        }
+
+        function openLauncherQuery(query: string): void {
+            bar.showLauncherQuery(query);
+        }
+
+        function closeLauncher(): void {
+            bar.closeLoadedPanel(launcherPanelLoader);
         }
 
         function openSettingsPage(page: string): void {
@@ -847,6 +900,19 @@ PanelWindow {
                 settings: settings
                 panelWindow: bar
                 notifications: bar.trackedNotifications
+            }
+        }
+    }
+
+    Loader {
+        id: launcherPanelLoader
+
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            LauncherPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
             }
         }
     }

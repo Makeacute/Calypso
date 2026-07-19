@@ -118,6 +118,7 @@ Widget options:
 - `processPanelWidth`, `processListLimit`, `polling.processListMs`
 - `notificationsPanelWidth`, `notificationsMaxVisible`, `notificationsGroupByApp`, `notificationsGroupsExpanded`
 - `notificationsShowBody`, `notificationsShowImages`, `notificationsShowActions`
+- `launcherPanelWidth`, `launcherMaxResults`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`

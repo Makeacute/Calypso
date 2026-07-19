@@ -1289,6 +1289,16 @@ PopupWindow {
                 width: parent.width
                 theme: root.theme
                 settings: root.settings
+                title: "Launcher"
+
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.launcherPanelWidth; minimum: Math.round(settings.effectiveSpacingXL * 14); maximum: Math.round(settings.effectiveSpacingXL * 34); step: Math.max(1, Math.round(settings.effectiveSpacingM)); suffix: "px"; onValueRequested: function(value) { settings.setNumber("launcherPanelWidth", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Max results"; value: settings.launcherMaxResults; minimum: 4; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("launcherMaxResults", value, minimum, maximum); } }
+            }
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
                 title: "System"
 
                 ChoiceRow {
