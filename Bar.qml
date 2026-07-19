@@ -14,6 +14,7 @@ PanelWindow {
     property bool startupComplete: false
     property bool barHovered: false
     property int lastWorkspaceId: -1
+    readonly property int reservedEdgeSize: settings.reserveSpace ? Math.max(0, Math.round(settings.barHeight + settings.screenMargin)) : 0
     readonly property real autohideOffset: {
         if (!settings.barAutohide || barHovered || settingsOpen) return 0;
         const offset = Math.max(0, settings.barHeight - theme.spacingXS);
@@ -255,7 +256,7 @@ PanelWindow {
     margins.left: settings.screenMargin
     margins.right: settings.screenMargin
     implicitHeight: settings.barHeight
-    exclusiveZone: settings.reserveSpace && !settings.barAutohide ? settings.barHeight + settings.screenMargin : 0
+    exclusiveZone: bar.reservedEdgeSize
     focusable: false
     aboveWindows: true
     color: "transparent"

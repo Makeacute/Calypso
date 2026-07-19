@@ -113,3 +113,28 @@ Date: 2026-07-18
 - Added user-facing labels for internal enum values such as `iconAndText`, `rightCenter`, `materialMorphing`, and Matugen scheme names.
 - Visually verified the Overview, Widgets, and Wallpaper pages with screenshots after reload.
 - Revalidated `settings.json` and confirmed no new Calypso/QML warnings after the redesign reloads.
+
+## Phase 0 Exclusive Zone Fix
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `CALYPSO_SESSION.md`
+
+### Bugs Fixed
+
+- Fixed the bar's reserved screen area when `barAutohide` is enabled. The `PanelWindow.exclusiveZone` now stays bound to the bar footprint instead of dropping to zero while hidden.
+
+### Decisions Made
+
+- Kept the exclusive zone reserved during autohide hide/show transitions to prevent Niri from resizing tiled windows during hover reveal.
+- Included `screenMargin` in the reserved edge size because the bar surface is inset from the screen edge; reserving only `barHeight` would still allow overlap by the margin amount.
+
+### Verification
+
+- Validated `settings.json` with `python3 -m json.tool settings.json`.
+- Verified tiled Niri window geometry for all bar styles (`islands`, `solid`, `pill`), both positions (`top`, `bottom`), and `barAutohide` on/off. The focused tiled window stayed at `1356x728` in every state, including autohide hidden and shown samples.
+- Captured screenshots for each style/position/autohide combination in `/tmp/calypso-phase0-20260719-134755`.
+- Restarted Quickshell after verification. The fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
