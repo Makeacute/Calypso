@@ -956,6 +956,8 @@ PopupWindow {
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Volume keys"; checked: settings.osdVolume; onToggled: function(checked) { settings.setValue("osdVolume", checked); } }
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Brightness keys"; checked: settings.osdBrightness; onToggled: function(checked) { settings.setValue("osdBrightness", checked); } }
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Keyboard backlight"; checked: settings.osdKeyboardBacklight; onToggled: function(checked) { settings.setValue("osdKeyboardBacklight", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Caps lock"; checked: settings.osdCapsLock; onToggled: function(checked) { settings.setValue("osdCapsLock", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Num lock"; checked: settings.osdNumLock; onToggled: function(checked) { settings.setValue("osdNumLock", checked); } }
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Media"; checked: settings.osdMedia; onToggled: function(checked) { settings.setValue("osdMedia", checked); } }
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Battery"; checked: settings.osdBattery; onToggled: function(checked) { settings.setValue("osdBattery", checked); } }
 

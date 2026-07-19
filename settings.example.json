@@ -473,5 +473,7 @@
   "workspaceToastTimeout": 1000,
   "fontFamilySans": "DejaVu Sans",
   "fontFamilyMono": "JetBrainsMono Nerd Font",
-  "fontFamilyIcon": "JetBrainsMono Nerd Font"
+  "fontFamilyIcon": "JetBrainsMono Nerd Font",
+  "osdCapsLock": true,
+  "osdNumLock": true
 }

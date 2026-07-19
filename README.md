@@ -100,7 +100,7 @@ Behavior and motion:
 - `reduceMotion`, `performanceMode`, `animationMs`
 - `motionFast`, `motionNormal`, `motionHover`, `motionPulse`, `motionBreath`, `motionOpen`, `motionClose`, `motionSpatial`, `motionEmphasis`
 - `osdEnabled`, `osdPosition`, `osdStyle`, `osdSize`, `osdOpacity`, `osdTimeout`
-- `osdShowIcon`, `osdShowPercent`, `osdVolume`, `osdBrightness`, `osdKeyboardBacklight`, `osdMedia`, `osdBattery`
+- `osdShowIcon`, `osdShowPercent`, `osdVolume`, `osdBrightness`, `osdKeyboardBacklight`, `osdCapsLock`, `osdNumLock`, `osdMedia`, `osdBattery`
 - `tooltipDelay`, `tooltipsEnabled`, `workspaceToastTimeout`
 
 Widget options:

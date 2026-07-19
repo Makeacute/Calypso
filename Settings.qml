@@ -539,6 +539,8 @@ Item {
     property bool osdVolume: adapter.osdVolume
     property bool osdBrightness: adapter.osdBrightness
     property bool osdKeyboardBacklight: adapter.osdKeyboardBacklight
+    property bool osdCapsLock: adapter.osdCapsLock
+    property bool osdNumLock: adapter.osdNumLock
     property bool osdMedia: adapter.osdMedia
     property bool osdBattery: adapter.osdBattery
     property int tooltipDelay: adapter.tooltipDelay
@@ -738,6 +740,8 @@ Item {
             property bool osdVolume: true
             property bool osdBrightness: true
             property bool osdKeyboardBacklight: true
+            property bool osdCapsLock: true
+            property bool osdNumLock: true
             property bool osdMedia: true
             property bool osdBattery: true
             property int tooltipDelay: 600

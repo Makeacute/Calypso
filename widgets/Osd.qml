@@ -23,6 +23,10 @@ PanelWindow {
     property bool lastMuted: false
     property string backlightPath: ""
     property real lastBrightness: -1
+    property string capsLockPath: ""
+    property string numLockPath: ""
+    property int lastCapsLock: -1
+    property int lastNumLock: -1
 
     function clamp01(value) {
         return Math.max(0, Math.min(1, Number(value) || 0));
@@ -34,6 +38,8 @@ PanelWindow {
         if (type === "volume" || type === "mute") return settings.osdVolume;
         if (type === "brightness") return settings.osdBrightness;
         if (type === "keyboard") return settings.osdKeyboardBacklight;
+        if (type === "capsLock") return settings.osdCapsLock;
+        if (type === "numLock") return settings.osdNumLock;
         if (type === "media") return settings.osdMedia;
         if (type === "battery") return settings.osdBattery;
         return true;
@@ -68,6 +74,8 @@ PanelWindow {
         if (osdLabel.length > 0) return osdLabel;
         if (osdType === "mute") return "Muted";
         if (osdType === "brightness") return "Brightness";
+        if (osdType === "capsLock") return osdValue >= 0.5 ? "Caps lock on" : "Caps lock off";
+        if (osdType === "numLock") return osdValue >= 0.5 ? "Num lock on" : "Num lock off";
         if (osdType === "battery") return "Battery";
         if (osdType === "media") return "Media";
         return "Volume";
@@ -126,6 +134,48 @@ PanelWindow {
         if (initialized && lastBrightness >= 0 && Math.abs(value - lastBrightness) > 0.004)
             show(brightnessIcon(value), value, "brightness", "Brightness");
         lastBrightness = value;
+    }
+
+    function updateLockPaths(text) {
+        const lines = String(text || "").trim().split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const parts = lines[i].split("=");
+            if (parts.length < 2) continue;
+
+            if (parts[0] === "caps") {
+                capsLockPath = parts.slice(1).join("=");
+                capsLockFile.path = capsLockPath;
+            } else if (parts[0] === "num") {
+                numLockPath = parts.slice(1).join("=");
+                numLockFile.path = numLockPath;
+            }
+        }
+    }
+
+    function updateLockState(type, text) {
+        const next = Number(String(text || "").trim()) > 0 ? 1 : 0;
+        if (type === "capsLock") {
+            if (initialized && lastCapsLock >= 0 && next !== lastCapsLock)
+                show("󰘲", next, "capsLock", next ? "Caps lock on" : "Caps lock off");
+            lastCapsLock = next;
+        } else if (type === "numLock") {
+            if (initialized && lastNumLock >= 0 && next !== lastNumLock)
+                show("󰎠", next, "numLock", next ? "Num lock on" : "Num lock off");
+            lastNumLock = next;
+        }
+    }
+
+    function valueText() {
+        if (osdType === "capsLock" || osdType === "numLock")
+            return osdValue >= 0.5 ? "ON" : "OFF";
+        return Math.round(osdValue * 100) + "%";
+    }
+
+    function fillColor() {
+        if (osdType === "mute") return theme.textMuted;
+        if ((osdType === "capsLock" || osdType === "numLock") && osdValue < 0.5) return theme.textMuted;
+        if (osdType === "battery" && osdValue <= 0.15) return theme.error;
+        return theme.primary;
     }
 
     screen: panelWindow ? panelWindow.screen : Quickshell.screens[0]
@@ -203,6 +253,15 @@ PanelWindow {
         stderr: StdioCollector {}
     }
 
+    Process {
+        id: lockDiscovery
+
+        command: ["sh", "-c", "for n in capslock numlock; do p=$(find -L /sys/class/leds -maxdepth 2 -iname \"*${n}\" 2>/dev/null | head -1); [ -n \"$p\" ] && printf '%s=%s/brightness\\n' \"${n%lock}\" \"$p\"; done"]
+        running: true
+        stdout: StdioCollector { onStreamFinished: root.updateLockPaths(text) }
+        stderr: StdioCollector {}
+    }
+
     FileView {
         id: brightnessFile
 
@@ -210,6 +269,28 @@ PanelWindow {
         watchChanges: true
         printErrors: false
         onFileChanged: if (!brightnessReadProc.running) brightnessReadProc.running = true
+    }
+
+    FileView {
+        id: capsLockFile
+
+        path: ""
+        watchChanges: true
+        blockLoading: true
+        printErrors: false
+        onLoaded: root.updateLockState("capsLock", text())
+        onFileChanged: root.updateLockState("capsLock", text())
+    }
+
+    FileView {
+        id: numLockFile
+
+        path: ""
+        watchChanges: true
+        blockLoading: true
+        printErrors: false
+        onLoaded: root.updateLockState("numLock", text())
+        onFileChanged: root.updateLockState("numLock", text())
     }
 
     Process {
@@ -274,7 +355,7 @@ PanelWindow {
             Text {
                 width: parent.width
                 visible: settings.osdShowPercent
-                text: Math.round(root.osdValue * 100) + "%"
+                text: root.valueText()
                 color: theme.textMuted
                 horizontalAlignment: Text.AlignHCenter
                 font.family: settings.fontFamilyMono
@@ -292,8 +373,8 @@ PanelWindow {
                 anchors.bottomMargin: settings.effectiveSpacingM
                 anchors.horizontalCenter: parent.horizontalCenter
                 radius: width / 2
-                color: theme.alpha(theme.text, 0.12)
-                border.color: theme.outlineSubtle
+                color: theme.alpha(theme.surfaceContainer, 0.72)
+                border.color: theme.outlineVariant
                 border.width: settings.effectiveBorderWidth
                 clip: true
                 antialiasing: true
@@ -305,7 +386,7 @@ PanelWindow {
                     anchors.margins: settings.effectiveBorderWidth
                     height: Math.max(0, (parent.height - settings.effectiveBorderWidth * 2) * root.osdValue)
                     radius: width / 2
-                    color: root.osdType === "mute" ? theme.textMuted : theme.accent
+                    color: root.fillColor()
                     antialiasing: true
                     Behavior on height { NumberAnimation { duration: theme.motionHover; easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: theme.motionNormal } }
@@ -319,7 +400,7 @@ PanelWindow {
                 width: parent.width
                 visible: settings.osdShowIcon
                 text: root.osdIcon
-                color: root.osdType === "mute" ? theme.textMuted : theme.accent
+                color: root.fillColor()
                 horizontalAlignment: Text.AlignHCenter
                 font.family: settings.fontFamilyIcon
                 font.pixelSize: settings.effectiveIconSize
@@ -337,7 +418,7 @@ PanelWindow {
                 width: settings.controlHeight
                 height: parent.height
                 text: root.osdIcon
-                color: root.osdType === "mute" ? theme.textMuted : theme.accent
+                color: root.fillColor()
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 font.family: settings.fontFamilyIcon
@@ -365,15 +446,20 @@ PanelWindow {
                     width: parent.width
                     height: Math.max(settings.effectiveBorderWidth * 3, Math.round(settings.effectiveSpacingS * 0.72))
                     radius: height / 2
-                    color: theme.alpha(theme.text, 0.12)
+                    color: theme.alpha(theme.surfaceContainer, 0.72)
+                    border.color: theme.outlineVariant
+                    border.width: settings.effectiveBorderWidth
                     antialiasing: true
                     clip: true
 
                     Rectangle {
-                        width: parent.width * root.osdValue
-                        height: parent.height
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.margins: settings.effectiveBorderWidth
+                        width: Math.max(0, (parent.width - settings.effectiveBorderWidth * 2) * root.osdValue)
                         radius: parent.radius
-                        color: root.osdType === "mute" ? theme.textMuted : theme.accent
+                        color: root.fillColor()
                         antialiasing: true
                         Behavior on width { NumberAnimation { duration: theme.motionHover; easing.type: Easing.OutCubic } }
                         Behavior on color { ColorAnimation { duration: theme.motionNormal } }
@@ -385,7 +471,7 @@ PanelWindow {
                 visible: settings.osdShowPercent
                 width: settings.effectiveFontSize * 4.2
                 height: parent.height
-                text: Math.round(root.osdValue * 100) + "%"
+                text: root.valueText()
                 color: theme.textMuted
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter

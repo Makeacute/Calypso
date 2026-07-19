@@ -213,3 +213,40 @@ Date: 2026-07-19
 - Restarted Quickshell and captured normal render screenshot at `/tmp/calypso-phase1-normal.png`.
 - Temporarily removed `palette.json`, restarted Quickshell, confirmed fallback render, captured `/tmp/calypso-phase1-palette-fallback.png`, then restored `palette.json`.
 - Fresh logs had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 1.5 OSD Visual Pass
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `widgets/Osd.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Redesigned OSD fill visuals around a tonal pill track using `surfaceContainer`, `outlineVariant`, `primary`, `error`, and muted text colors.
+- Added `capsLock` and `numLock` OSD types, settings keys `osdCapsLock` and `osdNumLock`, SettingsPanel toggles, and IPC trigger support.
+- Added event-backed `FileView` watchers for `/sys/class/leds/*capslock*/brightness` and `/sys/class/leds/*numlock*/brightness`.
+- Lock OSD states display `ON`/`OFF` rather than fake percentages.
+
+### Decisions Made
+
+- Used sysfs LED state as the real lock source because it exists on this machine and avoids polling.
+- Kept the existing `osdTimeout` and reveal/hide timing unchanged.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured volume and brightness screenshots: `/tmp/calypso-phase15-osd-volume.png`, `/tmp/calypso-phase15-osd-brightness.png`.
+- Attempted caps/num trigger with `ydotool key 58:1 58:0` and `ydotool key 69:1 69:0`; this virtual input path did not flip the hardware LED files, so the watcher did not fire in that test.
+- Verified caps/num visuals through IPC screenshots: `/tmp/calypso-phase15-osd-capslock-ipc.png`, `/tmp/calypso-phase15-osd-numlock-ipc.png`, `/tmp/calypso-phase15-osd-capslock-off-ipc.png`.
+- Confirmed auto-hide with `/tmp/calypso-phase15-osd-after-hide.png`.
+- Recorded OSD motion clip at `/tmp/calypso-phase15-osd-motion.mp4`; visual review showed the existing reveal/fill motion without snap.
+- 60 second idle sample on PID `76614`: `7.700s` CPU time, `12.833%` of one core. A follow-up `top` check showed Quickshell around `4.7%` then `7.8%`; logs stayed clean.
+- Fresh logs had no Calypso/QML warnings; only the known external Qt portal registration warning remained.

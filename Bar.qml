@@ -136,10 +136,10 @@ PanelWindow {
         function showOsd(kind: string, value: real): void {
             bar.ensureInteractionPhase();
             const type = String(kind || "volume");
-            const allowed = ["volume", "mute", "brightness", "keyboard", "media", "battery"];
+            const allowed = ["volume", "mute", "brightness", "keyboard", "capsLock", "numLock", "media", "battery"];
             if (allowed.indexOf(type) < 0) return;
             const amount = Math.max(0, Math.min(1, Number(value) || 0.72));
-            const icon = type === "brightness" ? "󰃠" : type === "keyboard" ? "󰌌" : type === "media" ? "󰝚" : type === "battery" ? "󰁹" : "󰕾";
+            const icon = type === "brightness" ? "󰃠" : type === "keyboard" ? "󰌌" : type === "capsLock" ? "󰘲" : type === "numLock" ? "󰎠" : type === "media" ? "󰝚" : type === "battery" ? "󰁹" : "󰕾";
             if (osdLoader.item)
                 osdLoader.item.show(icon, amount, type, type.charAt(0).toUpperCase() + type.slice(1));
         }
