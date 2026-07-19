@@ -363,3 +363,46 @@ Date: 2026-07-19
 - Restarted Quickshell after verification churn. Fresh instance `8k72ze8fit` loaded successfully.
 - Fresh closed-panel 60 second idle sample on PID `103112`: `0.950s` CPU time, `1.583%` of one core.
 - Fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 3 Dashboard Module
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `DashboardPanel.qml`
+- `Bar.qml`
+- `ModuleHost.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added `DashboardPanel.qml` as a compact standalone dashboard surface triggered by the dashboard/controls bar module.
+- Added dashboard quick toggles for Wi-Fi, Bluetooth, mic, and DND, with unavailable DND shown disabled because no supported notification-control backend is installed.
+- Added an open-only media card backed by `playerctl`, with playback controls and a scrubber.
+- Added compact CPU, memory, network, and battery rows using miniature gauge/sparkline treatment and existing module polling intervals.
+- Added settings keys for dashboard width, media/weather visibility, grow-from-trigger motion, quick-toggle order, performance-row order, and dashboard open-only polling.
+- Added `openDashboard`/`closeDashboard` IPC aliases while preserving `openControls`/`closeControls`.
+
+### Decisions Made
+
+- Kept Dashboard as its own module after user correction; normal module clicks and `openModule` continue to use `ModuleDetailsPanel.qml`.
+- Kept `controls`, `controlCenter`, and `quickControls` as aliases for the canonical `dashboard` module id so old configs continue to work.
+- Skipped weather data integration because no existing weather source is present; the optional weather card only reports that no source is configured.
+- Used `wf-recorder` for motion capture and `ffmpeg` for frame extraction because direct `ffmpeg` Wayland capture is unavailable on this setup.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured dashboard screenshot at `/tmp/calypso-phase3-dashboard-module-final.png`.
+- Captured restored per-module network popup at `/tmp/calypso-phase3-module-network-final.png`, confirming module UIs were not replaced by the dashboard.
+- Temporarily added the dashboard trigger to the right bar section, recorded grow-from-trigger motion via `ydotool` click at `/tmp/calypso-phase3-dashboard-grow.mp4`, and reviewed `/tmp/calypso-phase3-dashboard-grow-contact.png`.
+- Recorded reduce-motion dashboard trigger at `/tmp/calypso-phase3-dashboard-grow-reduce-motion.mp4` and reviewed `/tmp/calypso-phase3-dashboard-grow-reduce-contact.png`; original `settings.json` was restored afterward.
+- Fresh instance `zqx21g9fit` loaded successfully after the dashboard routing fix.
+- Closed-dashboard 60 second sample on PID `137051`: `1.730s` CPU time, `2.883%` of one core.
+- Open-dashboard 60 second sample on PID `137051`: `1.630s` CPU time, `2.717%` of one core.
+- Current log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.

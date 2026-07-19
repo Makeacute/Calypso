@@ -17,7 +17,7 @@
     "battery",
     "caffeine",
     "clock",
-    "controls",
+    "dashboard",
     "tray",
     "settings"
   ],
@@ -81,6 +81,22 @@
   "mediaMaxTitleLength": 36,
   "mediaMaxWidth": 180,
   "mediaShowControls": true,
+  "dashboardPanelWidth": 420,
+  "dashboardShowMedia": true,
+  "dashboardShowWeather": false,
+  "dashboardGrowFromTrigger": true,
+  "dashboardQuickToggles": [
+    "wifi",
+    "bluetooth",
+    "mic",
+    "dnd"
+  ],
+  "dashboardPerformanceModules": [
+    "cpu",
+    "memory",
+    "network",
+    "battery"
+  ],
   "memoryShowGraph": false,
   "modulePopupDefaultTab": "Overview",
   "modulePopupHistorySamples": 24,
@@ -287,6 +303,7 @@
     },
     {
       "aliases": [
+        "controls",
         "controlCenter",
         "quickControls"
       ],
@@ -297,8 +314,8 @@
       "defaultSection": "right",
       "defaultVisible": false,
       "icon": "󰒓",
-      "id": "controls",
-      "label": "Quick controls"
+      "id": "dashboard",
+      "label": "Dashboard"
     },
     {
       "aliases": [],
@@ -320,7 +337,7 @@
     "brightness": true,
     "caffeine": false,
     "clock": false,
-    "controls": true,
+    "dashboard": true,
     "cpu": true,
     "focusedWindow": true,
     "media": true,
@@ -366,6 +383,8 @@
     "brightnessMs": 15000,
     "clockMs": 1000,
     "cpuMs": 13000,
+    "dashboardMediaMs": 500,
+    "dashboardStateMs": 5000,
     "mediaMs": 2000,
     "memoryMs": 5000,
     "networkMs": 5000,

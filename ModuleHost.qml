@@ -77,7 +77,7 @@ Item {
         if (name === "battery" || name === "bat") return batteryComponent;
         if (name === "caffeine" || name === "idleInhibitor" || name === "idle") return caffeineComponent;
         if (name === "clock" || name === "time") return clockComponent;
-        if (name === "controls" || name === "controlCenter" || name === "quickControls") return controlsComponent;
+        if (name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard") return controlsComponent;
         if (name === "tray") return trayComponent;
         if (name === "settings") return settingsComponent;
         return null;
@@ -86,7 +86,7 @@ Item {
     function loadPhase(name) {
         if (name === "workspaces" || name === "focusedWindow" || name === "clock" || name === "time")
             return 1;
-        if (name === "settings" || name === "controls" || name === "controlCenter" || name === "quickControls")
+        if (name === "settings" || name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard")
             return 3;
         return 2;
     }

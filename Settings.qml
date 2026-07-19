@@ -394,6 +394,8 @@ Item {
         if (moduleName === "settings") return adapter.showSettingsButton;
 
         const visibility = adapter.moduleVisibility || {};
+        const id = moduleEntry(moduleName).id;
+        if (visibility[id] !== undefined) return visibility[id] !== false;
         return visibility[moduleName] !== false;
     }
 
@@ -404,7 +406,7 @@ Item {
         }
 
         const visibility = Object.assign({}, adapter.moduleVisibility || {});
-        visibility[moduleName] = value;
+        visibility[moduleEntry(moduleName).id] = value;
         adapter.moduleVisibility = visibility;
     }
 
@@ -616,6 +618,12 @@ Item {
     property bool mediaShowControls: adapter.mediaShowControls
     property int mediaMaxWidth: adapter.mediaMaxWidth
     property int mediaMaxTitleLength: adapter.mediaMaxTitleLength
+    property int dashboardPanelWidth: adapter.dashboardPanelWidth
+    property bool dashboardShowMedia: adapter.dashboardShowMedia
+    property bool dashboardShowWeather: adapter.dashboardShowWeather
+    property bool dashboardGrowFromTrigger: adapter.dashboardGrowFromTrigger
+    property var dashboardQuickToggles: adapter.dashboardQuickToggles
+    property var dashboardPerformanceModules: adapter.dashboardPerformanceModules
     property bool trayCompact: adapter.trayCompact
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
@@ -667,6 +675,8 @@ Item {
     property int memoryPollMs: pollInterval("memoryMs", 5000)
     property int networkPollMs: pollInterval("networkMs", 5000)
     property int mediaPollMs: pollInterval("mediaMs", 2000)
+    property int dashboardMediaPollMs: pollInterval("dashboardMediaMs", 500)
+    property int dashboardStatePollMs: pollInterval("dashboardStateMs", 5000)
     property int batteryFallbackPollMs: pollInterval("batteryFallbackMs", 30000)
     property int clockPollMs: pollInterval("clockMs", 1000)
     property int brightnessPollMs: pollInterval("brightnessMs", 15000)
@@ -799,6 +809,12 @@ Item {
             property bool mediaShowControls: true
             property int mediaMaxWidth: 180
             property int mediaMaxTitleLength: 36
+            property int dashboardPanelWidth: 420
+            property bool dashboardShowMedia: true
+            property bool dashboardShowWeather: false
+            property bool dashboardGrowFromTrigger: true
+            property var dashboardQuickToggles: ["wifi", "bluetooth", "mic", "dnd"]
+            property var dashboardPerformanceModules: ["cpu", "memory", "network", "battery"]
             property bool trayCompact: true
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true
@@ -854,10 +870,10 @@ Item {
                 { "id": "battery", "label": "Battery", "icon": "󰁹", "category": "System", "aliases": ["bat"], "defaultSection": "right", "defaultVisible": true, "configurable": true, "cost": "event", "capabilities": [] },
                 { "id": "caffeine", "label": "Caffeine", "icon": "󰅶", "category": "Controls", "aliases": ["idleInhibitor", "idle"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "local", "capabilities": [] },
                 { "id": "clock", "label": "Clock", "icon": "󰥔", "category": "Shell", "aliases": ["time"], "defaultSection": "right", "defaultVisible": true, "configurable": true, "cost": "timer", "capabilities": [] },
-                { "id": "controls", "label": "Quick controls", "icon": "󰒓", "category": "Shell", "aliases": ["controlCenter", "quickControls"], "defaultSection": "right", "defaultVisible": false, "configurable": false, "cost": "lazy", "capabilities": [] },
+                { "id": "dashboard", "label": "Dashboard", "icon": "󰒓", "category": "Shell", "aliases": ["controls", "controlCenter", "quickControls"], "defaultSection": "right", "defaultVisible": false, "configurable": false, "cost": "lazy", "capabilities": [] },
                 { "id": "tray", "label": "Tray", "icon": "󰒲", "category": "System", "aliases": [], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "event", "capabilities": [] }
             ]
-            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "controls", "tray", "settings"]
+            property var availableModules: ["workspaces", "focusedWindow", "cpu", "memory", "network", "bluetooth", "audio", "brightness", "powerProfile", "media", "battery", "caffeine", "clock", "dashboard", "tray", "settings"]
             property var leftModules: ["workspaces", "media"]
             property var centerModules: ["clock"]
             property var rightModules: ["audio", "network", "battery", "cpu", "memory", "tray", "settings"]
@@ -875,7 +891,7 @@ Item {
                 "battery": true,
                 "caffeine": false,
                 "clock": true,
-                "controls": false,
+                "dashboard": false,
                 "tray": false
             })
             property var polling: ({
@@ -883,6 +899,8 @@ Item {
                 "memoryMs": 5000,
                 "networkMs": 5000,
                 "mediaMs": 2000,
+                "dashboardMediaMs": 500,
+                "dashboardStateMs": 5000,
                 "batteryFallbackMs": 30000,
                 "clockMs": 1000,
                 "brightnessMs": 15000,

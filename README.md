@@ -12,7 +12,7 @@ Calypso is a lightweight Quickshell bar for Niri. Its design priorities are poli
 - `BarSection.qml`: island surface for one module section.
 - `ModuleHost.qml`: module id to widget component registry.
 - `SettingsPanel.qml`: live customization panel for appearance, layout, modules, widgets, behavior, and performance.
-- `ClockPanel.qml`, `ControlCenterPanel.qml`, `ModuleDetailsPanel.qml`: anchored popups.
+- `ClockPanel.qml`, `DashboardPanel.qml`, `ModuleDetailsPanel.qml`, `SettingsPanel.qml`: anchored shell surfaces.
 - `services/`: compositor, Niri event-stream, and wallpaper/palette services.
 - `widgets/`: bar modules plus shared overlays such as `Osd.qml`, `TooltipHost.qml`, and `WorkspaceToast.qml`.
 - `tools/calypso-perf-audit`: read-only performance snapshot helper.
@@ -111,6 +111,8 @@ Widget options:
 - `networkShowSpeed`, `networkInterfaceName`
 - `batteryShowPercentage`, `batteryCriticalThreshold`
 - `modulePopupShowGauge`, `modulePopupShowSparkline`, `modulePopupHistorySamples`, `modulePopupNetworkScaleKib`
+- `dashboardPanelWidth`, `dashboardShowMedia`, `dashboardShowWeather`, `dashboardGrowFromTrigger`
+- `dashboardQuickToggles`, `dashboardPerformanceModules`, `polling.dashboardMediaMs`, `polling.dashboardStateMs`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`

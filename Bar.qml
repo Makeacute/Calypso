@@ -42,7 +42,7 @@ PanelWindow {
     function showSettings(anchorItem) {
         ensureInteractionPhase();
         closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         if (settingsPanelLoader.item)
             settingsPanelLoader.item.toggle(anchorItem);
@@ -51,7 +51,7 @@ PanelWindow {
     function showClock(anchorItem) {
         ensureInteractionPhase();
         closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         if (clockPanelLoader.item)
             clockPanelLoader.item.toggle(anchorItem);
@@ -62,15 +62,15 @@ PanelWindow {
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
-        if (controlCenterPanelLoader.item)
-            controlCenterPanelLoader.item.toggle(anchorItem);
+        if (dashboardPanelLoader.item)
+            dashboardPanelLoader.item.toggle(anchorItem);
     }
 
     function showModuleDetails(moduleName, anchorItem) {
         ensureInteractionPhase();
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
         if (moduleDetailsPanelLoader.item)
             moduleDetailsPanelLoader.item.toggle(moduleName, anchorItem);
     }
@@ -78,7 +78,7 @@ PanelWindow {
     function openSettingsPage(page) {
         ensureInteractionPhase();
         closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
         if (settingsPanelLoader.item)
             settingsPanelLoader.item.openPage(page);
@@ -88,7 +88,7 @@ PanelWindow {
         ensureInteractionPhase();
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
         if (moduleDetailsPanelLoader.item)
             moduleDetailsPanelLoader.item.open(moduleName, null);
     }
@@ -117,7 +117,15 @@ PanelWindow {
         }
 
         function closeControls(): void {
-            bar.closeLoadedPanel(controlCenterPanelLoader);
+            bar.closeLoadedPanel(dashboardPanelLoader);
+        }
+
+        function openDashboard(): void {
+            bar.showControls(null);
+        }
+
+        function closeDashboard(): void {
+            bar.closeLoadedPanel(dashboardPanelLoader);
         }
 
         function openSettingsPage(page: string): void {
@@ -127,7 +135,7 @@ PanelWindow {
         function openSettingsDetail(moduleName: string): void {
             bar.ensureInteractionPhase();
             bar.closeLoadedPanel(clockPanelLoader);
-            bar.closeLoadedPanel(controlCenterPanelLoader);
+            bar.closeLoadedPanel(dashboardPanelLoader);
             bar.closeLoadedPanel(moduleDetailsPanelLoader);
             if (settingsPanelLoader.item)
                 settingsPanelLoader.item.openModuleOptions(moduleName);
@@ -163,7 +171,7 @@ PanelWindow {
             bar.ensureInteractionPhase();
             bar.closeLoadedPanel(settingsPanelLoader);
             bar.closeLoadedPanel(clockPanelLoader);
-            bar.closeLoadedPanel(controlCenterPanelLoader);
+            bar.closeLoadedPanel(dashboardPanelLoader);
             if (moduleDetailsPanelLoader.item)
                 moduleDetailsPanelLoader.item.openTab(moduleName, tabName, null);
         }
@@ -606,11 +614,11 @@ PanelWindow {
     }
 
     Loader {
-        id: controlCenterPanelLoader
+        id: dashboardPanelLoader
 
         active: bar.interactionPhaseReady
         sourceComponent: Component {
-            ControlCenterPanel {
+            DashboardPanel {
                 theme: theme
                 settings: settings
                 panelWindow: bar

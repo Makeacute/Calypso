@@ -267,6 +267,19 @@ PopupWindow {
         fontProc.running = true;
     }
 
+    function csvList(text) {
+        const seen = {};
+        const next = [];
+        const parts = String(text || "").split(",");
+        for (let i = 0; i < parts.length; i++) {
+            const value = parts[i].trim();
+            if (value.length <= 0 || seen[value]) continue;
+            seen[value] = true;
+            next.push(value);
+        }
+        return next;
+    }
+
     function animatePageTransition(direction) {
         if (!settings || settings.motionNormal <= 0) {
             pageTransition.stop();
@@ -1209,6 +1222,22 @@ PopupWindow {
         Column {
             width: pageLoader.width
             spacing: settings.panelPadding
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                title: "Dashboard"
+
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Media card"; checked: settings.dashboardShowMedia; onToggled: function(checked) { settings.setValue("dashboardShowMedia", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Weather card"; checked: settings.dashboardShowWeather; onToggled: function(checked) { settings.setValue("dashboardShowWeather", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Grow from trigger"; checked: settings.dashboardGrowFromTrigger; onToggled: function(checked) { settings.setValue("dashboardGrowFromTrigger", checked); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.dashboardPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("dashboardPanelWidth", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Media refresh"; value: settings.dashboardMediaPollMs; minimum: 250; maximum: 2000; step: 50; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardMediaMs", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Toggle refresh"; value: settings.dashboardStatePollMs; minimum: 1000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardStateMs", value, minimum, maximum); } }
+                TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Quick toggles"; value: Array.from(settings.dashboardQuickToggles || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardQuickToggles", root.csvList(text)); } }
+                TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Performance rows"; value: Array.from(settings.dashboardPerformanceModules || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardPerformanceModules", root.csvList(text)); } }
+            }
 
             SectionBlock {
                 width: parent.width
