@@ -32,6 +32,7 @@ PopupWindow {
     property real networkRxRate: 0
     property real networkTxRate: 0
     property bool pendingRefresh: false
+    property string queuedActionCommand: ""
     readonly property bool hasAudio: sink && sink.audio
 
     function shellQuote(value) {
@@ -328,7 +329,11 @@ PopupWindow {
     }
 
     function runAction(command) {
-        if (actionProc.running) return;
+        if (actionProc.running) {
+            queuedActionCommand = command;
+            return;
+        }
+
         actionProc.command = ["sh", "-c", command];
         actionProc.running = true;
     }
@@ -400,7 +405,16 @@ PopupWindow {
         stderr: StdioCollector {
             onStreamFinished: if (text.trim().length > 0) console.warn("Module action:", text.trim())
         }
-        onExited: root.refresh()
+        onExited: {
+            if (root.queuedActionCommand.length > 0) {
+                const command = root.queuedActionCommand;
+                root.queuedActionCommand = "";
+                root.runAction(command);
+                return;
+            }
+
+            root.refresh();
+        }
     }
 
     MouseArea {
@@ -1506,6 +1520,8 @@ PopupWindow {
         property real maximum: 100
         property real step: 1
         property string suffix: ""
+        property bool dragging: false
+        property real liveValue: value
 
         signal valueRequested(real value)
 
@@ -1520,7 +1536,12 @@ PopupWindow {
 
         function ratio() {
             if (maximum <= minimum) return 0;
-            return (clamped(value) - minimum) / (maximum - minimum);
+            return (clamped(liveValue) - minimum) / (maximum - minimum);
+        }
+
+        onValueChanged: {
+            if (!dragging)
+                liveValue = value;
         }
 
         implicitHeight: labelText.implicitHeight + settings.effectiveContentSpacing + settings.controlHeight
@@ -1547,7 +1568,7 @@ PopupWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             width: Math.round(settings.effectiveFontSize * 6)
-            text: Math.round(sliderRoot.value) + sliderRoot.suffix
+            text: Math.round(sliderRoot.liveValue) + sliderRoot.suffix
             color: theme.textMuted
             horizontalAlignment: Text.AlignRight
             font.family: settings.fontFamily
@@ -1611,11 +1632,26 @@ PopupWindow {
 
                     const bounded = Math.max(0, Math.min(trackArea.width, mouseX));
                     const raw = sliderRoot.minimum + (bounded / trackArea.width) * (sliderRoot.maximum - sliderRoot.minimum);
-                    sliderRoot.valueRequested(sliderRoot.snapped(raw));
+                    const next = sliderRoot.snapped(raw);
+                    const previous = sliderRoot.liveValue;
+                    sliderRoot.liveValue = next;
+                    if (Math.abs(next - previous) > 0.0001)
+                        sliderRoot.valueRequested(next);
                 }
 
-                onPressed: function(mouse) { commit(mouse.x); }
+                onPressed: function(mouse) {
+                    sliderRoot.dragging = true;
+                    commit(mouse.x);
+                }
                 onPositionChanged: function(mouse) { if (pressed) commit(mouse.x); }
+                onReleased: {
+                    sliderRoot.dragging = false;
+                    sliderRoot.liveValue = sliderRoot.value;
+                }
+                onCanceled: {
+                    sliderRoot.dragging = false;
+                    sliderRoot.liveValue = sliderRoot.value;
+                }
             }
         }
     }

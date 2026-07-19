@@ -555,3 +555,34 @@ Date: 2026-07-19
 - Idle CPU sample with notification drawer closed on PID `4786`: `0.860s` CPU over `60.000s`, `1.433%` of one core.
 - Idle CPU sample with notification drawer open on PID `4786`: `0.880s` CPU over `60.000s`, `1.467%` of one core.
 - Fixed a transient delegate-width binding warning in `NotificationPanel.qml`; the fresh final log tail had no Calypso/QML warnings or errors.
+
+## Phase 6 Live Slider Updates
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `ModuleDetailsPanel.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Updated the module-details `SliderRow` used by audio and brightness so value text and knob position follow a local `liveValue` while the pointer is dragging.
+- Added latest-command queuing for module action commands so brightness dragging does not drop the final requested brightness when a previous `brightnessctl` process is still running.
+
+### Decisions Made
+
+- Kept this scoped to `ModuleDetailsPanel.qml`, where the current volume and brightness sliders live.
+- Did not add a new timer or polling interval; this remains event/drag driven.
+- Kept audio volume writes routed through the existing PipeWire binding and brightness writes routed through the existing `brightnessctl` command path.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured audio live-slider screenshot at `/tmp/calypso-phase6-audio-live-slider.png`.
+- Captured brightness live-slider screenshot at `/tmp/calypso-phase6-brightness-live-slider-final.png`.
+- Attempted a real ydotool drag and recorded `/tmp/calypso-phase6-audio-drag-motion.mp4` plus contact sheet `/tmp/calypso-phase6-audio-drag-contact.png`; ydotool still did not reliably deliver the drag through Niri in this session, so this was not treated as a real input success.
+- Ran an active audio live-update stress check with the panel open and restored volume afterward. A high-rate external `wpctl` stream measured `3.000s` CPU over `15.001s`, `19.999%` of one core; a lower-rate stream measured `1.390s` CPU over `15.004s`, `9.264%` of one core.
+- Post-update idle sample on PID `4786`: `0.280s` CPU over `15.000s`, `1.867%` of one core.
+- Confirmed final audio volume was restored to `0.15`.
+- Final log window had no Calypso/QML warnings or errors.
