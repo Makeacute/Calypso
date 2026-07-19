@@ -1,35 +1,22 @@
 import QtQuick
-import Quickshell.Services.Notifications
 
 Pill {
     id: root
 
     property bool settingsOpen: false
-    readonly property var trackedNotifications: notificationServer.trackedNotifications ? notificationServer.trackedNotifications.values : []
-    readonly property int notificationCount: trackedNotifications.length
+    property bool notificationOpen: false
+    property int notificationCount: 0
 
     signal requested(var anchorItem)
+    signal notificationsRequested(var anchorItem)
 
     icon: ""
-    active: settingsOpen
+    active: settingsOpen || notificationOpen
     clickable: true
     minimumWidth: Math.max(settings.moduleHeight, settings.effectiveIconSize + settings.effectivePillPadding * 2)
     onClicked: requested(root)
-
-    NotificationServer {
-        id: notificationServer
-
-        keepOnReload: true
-        persistenceSupported: true
-        bodySupported: false
-        actionsSupported: false
-        imageSupported: false
-
-        onNotification: function(notification) {
-            if (notification && !notification.transient)
-                notification.tracked = true;
-        }
-    }
+    onRightClicked: notificationsRequested(root)
+    tooltipText: root.notificationCount > 0 ? "Settings / " + root.notificationCount + " notifications" : "Settings"
 
     Rectangle {
         id: badge
@@ -69,6 +56,18 @@ Pill {
             font.family: settings.fontFamilyMono
             font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.65))
             font.weight: Font.DemiBold
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.notificationCount > 0
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onClicked: function(mouse) {
+                root.notificationsRequested(root);
+                mouse.accepted = true;
+            }
         }
     }
 }

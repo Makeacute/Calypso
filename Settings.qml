@@ -632,6 +632,13 @@ Item {
     property int clipboardMaxItems: adapter.clipboardMaxItems
     property int processPanelWidth: adapter.processPanelWidth
     property int processListLimit: adapter.processListLimit
+    property int notificationsPanelWidth: adapter.notificationsPanelWidth
+    property int notificationsMaxVisible: adapter.notificationsMaxVisible
+    property bool notificationsGroupByApp: adapter.notificationsGroupByApp
+    property bool notificationsGroupsExpanded: adapter.notificationsGroupsExpanded
+    property bool notificationsShowBody: adapter.notificationsShowBody
+    property bool notificationsShowImages: adapter.notificationsShowImages
+    property bool notificationsShowActions: adapter.notificationsShowActions
     property bool trayCompact: adapter.trayCompact
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
@@ -832,6 +839,13 @@ Item {
             property int clipboardMaxItems: 20
             property int processPanelWidth: 520
             property int processListLimit: 12
+            property int notificationsPanelWidth: 460
+            property int notificationsMaxVisible: 24
+            property bool notificationsGroupByApp: true
+            property bool notificationsGroupsExpanded: true
+            property bool notificationsShowBody: true
+            property bool notificationsShowImages: true
+            property bool notificationsShowActions: true
             property bool trayCompact: true
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true

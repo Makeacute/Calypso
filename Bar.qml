@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Notifications
 import QtQuick
 import "services"
 import "widgets"
@@ -11,6 +12,9 @@ PanelWindow {
 
     required property var modelData
     readonly property bool settingsOpen: settingsPanelLoader.item ? settingsPanelLoader.item.visible : false
+    readonly property bool notificationsOpen: notificationPanelLoader.item ? notificationPanelLoader.item.visible : false
+    readonly property var trackedNotifications: notificationServer.trackedNotifications ? notificationServer.trackedNotifications.values : []
+    readonly property int notificationCount: trackedNotifications.length
     property bool backgroundPhaseReady: false
     property bool interactionPhaseReady: false
     property bool startupComplete: false
@@ -43,6 +47,7 @@ PanelWindow {
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         closeLoadedPanel(processPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
     }
 
     function showSettings(anchorItem) {
@@ -53,6 +58,19 @@ PanelWindow {
         closeToolPanels();
         if (settingsPanelLoader.item)
             settingsPanelLoader.item.toggle(anchorItem);
+    }
+
+    function showNotifications(anchorItem) {
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notepadPanelLoader);
+        closeLoadedPanel(clipboardPanelLoader);
+        closeLoadedPanel(processPanelLoader);
+        if (notificationPanelLoader.item)
+            notificationPanelLoader.item.toggle(anchorItem);
     }
 
     function showClock(anchorItem) {
@@ -81,6 +99,7 @@ PanelWindow {
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         closeLoadedPanel(processPanelLoader);
         if (notepadPanelLoader.item)
@@ -93,6 +112,7 @@ PanelWindow {
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(dashboardPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(processPanelLoader);
         if (clipboardPanelLoader.item)
@@ -104,6 +124,7 @@ PanelWindow {
         closeLoadedPanel(settingsPanelLoader);
         closeLoadedPanel(clockPanelLoader);
         closeLoadedPanel(moduleDetailsPanelLoader);
+        closeLoadedPanel(notificationPanelLoader);
         closeLoadedPanel(notepadPanelLoader);
         closeLoadedPanel(clipboardPanelLoader);
         if (processPanelLoader.item)
@@ -178,6 +199,14 @@ PanelWindow {
 
         function closeSettings(): void {
             bar.closeLoadedPanel(settingsPanelLoader);
+        }
+
+        function openNotifications(): void {
+            bar.showNotifications(null);
+        }
+
+        function closeNotifications(): void {
+            bar.closeLoadedPanel(notificationPanelLoader);
         }
 
         function openClock(): void {
@@ -396,6 +425,25 @@ PanelWindow {
         settings: settings
     }
 
+    NotificationServer {
+        id: notificationServer
+
+        keepOnReload: true
+        persistenceSupported: true
+        bodySupported: settings.notificationsShowBody
+        bodyMarkupSupported: false
+        bodyHyperlinksSupported: false
+        bodyImagesSupported: settings.notificationsShowImages
+        actionsSupported: settings.notificationsShowActions
+        actionIconsSupported: false
+        imageSupported: settings.notificationsShowImages
+
+        onNotification: function(notification) {
+            if (notification && !notification.transient)
+                notification.tracked = true;
+        }
+    }
+
     screen: modelData
     anchors.top: settings.barPosition !== "bottom"
     anchors.bottom: settings.barPosition === "bottom"
@@ -476,6 +524,8 @@ PanelWindow {
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
+                notificationCount: bar.notificationCount
+                notificationOpen: bar.notificationsOpen
                 modules: settings.leftModules
                 active: settings.barStyle === "islands" || leftSection.opacity > 0
                 backgroundReady: bar.backgroundPhaseReady
@@ -487,6 +537,7 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                 onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                 onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                 onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -501,6 +552,8 @@ PanelWindow {
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
+                notificationCount: bar.notificationCount
+                notificationOpen: bar.notificationsOpen
                 modules: settings.centerModules
                 active: settings.barStyle === "islands" || centerSection.opacity > 0
                 backgroundReady: bar.backgroundPhaseReady
@@ -513,6 +566,7 @@ PanelWindow {
                 x: Math.round(Math.max(layout.leftEdge,
                                        Math.min((parent.width - width) / 2, layout.rightEdge)))
                 onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                 onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                 onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                 onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -527,6 +581,8 @@ PanelWindow {
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
+                notificationCount: bar.notificationCount
+                notificationOpen: bar.notificationsOpen
                 modules: settings.rightModules
                 active: settings.barStyle === "islands" || rightSection.opacity > 0
                 backgroundReady: bar.backgroundPhaseReady
@@ -538,6 +594,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                 onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                 onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                 onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -575,6 +632,8 @@ PanelWindow {
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
+                        notificationCount: bar.notificationCount
+                        notificationOpen: bar.notificationsOpen
                         modules: settings.leftModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
                         backgroundReady: bar.backgroundPhaseReady
@@ -583,6 +642,7 @@ PanelWindow {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                        onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                         onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                         onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                         onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -597,6 +657,8 @@ PanelWindow {
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
+                        notificationCount: bar.notificationCount
+                        notificationOpen: bar.notificationsOpen
                         modules: settings.centerModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
                         backgroundReady: bar.backgroundPhaseReady
@@ -605,6 +667,7 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         x: Math.round((parent.width - width) / 2)
                         onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                        onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                         onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                         onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                         onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -619,6 +682,8 @@ PanelWindow {
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
+                        notificationCount: bar.notificationCount
+                        notificationOpen: bar.notificationsOpen
                         modules: settings.rightModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
                         backgroundReady: bar.backgroundPhaseReady
@@ -627,6 +692,7 @@ PanelWindow {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                        onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                         onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                         onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                         onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -669,6 +735,8 @@ PanelWindow {
                     panelWindow: bar
                     osd: osdLoader.item
                     tooltipHost: tooltipHostLoader.item
+                    notificationCount: bar.notificationCount
+                    notificationOpen: bar.notificationsOpen
                     modules: bar.combinedModules()
                     active: settings.barStyle === "pill" || pillSurface.opacity > 0
                     backgroundReady: bar.backgroundPhaseReady
@@ -676,6 +744,7 @@ PanelWindow {
                     settingsOpen: bar.settingsOpen
                     anchors.centerIn: parent
                     onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
+                    onNotificationsRequested: function(anchorItem) { bar.showNotifications(anchorItem); }
                     onClockRequested: function(anchorItem) { bar.showClock(anchorItem); }
                     onControlsRequested: function(anchorItem) { bar.showControls(anchorItem); }
                     onModuleDetailsRequested: function(moduleName, anchorItem) { bar.showModuleDetails(moduleName, anchorItem); }
@@ -769,6 +838,20 @@ PanelWindow {
     }
 
     Loader {
+        id: notificationPanelLoader
+
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            NotificationPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+                notifications: bar.trackedNotifications
+            }
+        }
+    }
+
+    Loader {
         id: moduleDetailsPanelLoader
 
         active: bar.interactionPhaseReady
@@ -857,6 +940,8 @@ PanelWindow {
         property var panelWindow
         property var osd
         property var tooltipHost
+        property int notificationCount: 0
+        property bool notificationOpen: false
         property var modules: []
         property bool active: true
         property bool backgroundReady: true
@@ -865,6 +950,7 @@ PanelWindow {
         readonly property var moduleList: Array.from(modules || [])
 
         signal settingsRequested(var anchorItem)
+        signal notificationsRequested(var anchorItem)
         signal clockRequested(var anchorItem)
         signal controlsRequested(var anchorItem)
         signal moduleDetailsRequested(string moduleName, var anchorItem)
@@ -890,12 +976,15 @@ PanelWindow {
                 panelWindow: strip.panelWindow
                 osd: strip.osd
                 tooltipHost: strip.tooltipHost
+                notificationCount: strip.notificationCount
+                notificationOpen: strip.notificationOpen
                 moduleName: String(strip.moduleList[index])
                 active: strip.active
                 backgroundReady: strip.backgroundReady
                 interactionReady: strip.interactionReady
                 settingsOpen: strip.settingsOpen
                 onSettingsRequested: function(anchorItem) { strip.settingsRequested(anchorItem); }
+                onNotificationsRequested: function(anchorItem) { strip.notificationsRequested(anchorItem); }
                 onClockRequested: function(anchorItem) { strip.clockRequested(anchorItem); }
                 onControlsRequested: function(anchorItem) { strip.controlsRequested(anchorItem); }
                 onModuleDetailsRequested: function(moduleName, anchorItem) { strip.moduleDetailsRequested(moduleName, anchorItem); }

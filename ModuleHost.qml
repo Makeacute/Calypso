@@ -12,6 +12,8 @@ Item {
     property var panelWindow
     property var osd
     property var tooltipHost
+    property int notificationCount: 0
+    property bool notificationOpen: false
     property string moduleName: ""
     property bool active: true
     property bool backgroundReady: true
@@ -24,6 +26,7 @@ Item {
     readonly property bool moduleVisible: moduleEnabled && loader.status === Loader.Ready && loadedWidth > 0 && loadedHeight > 0
 
     signal settingsRequested(var anchorItem)
+    signal notificationsRequested(var anchorItem)
     signal clockRequested(var anchorItem)
     signal controlsRequested(var anchorItem)
     signal moduleDetailsRequested(string moduleName, var anchorItem)
@@ -122,5 +125,17 @@ Item {
     Component { id: clipboardComponent; Clipboard { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
     Component { id: processesComponent; Processes { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
     Component { id: trayComponent; Tray { theme: root.theme; settings: root.settings; panelWindow: root.panelWindow } }
-    Component { id: settingsComponent; SettingsButton { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; settingsOpen: root.settingsOpen; onRequested: function(anchorItem) { root.settingsRequested(anchorItem); } } }
+    Component {
+        id: settingsComponent
+        SettingsButton {
+            theme: root.theme
+            settings: root.settings
+            tooltipHost: root.tooltipHost
+            settingsOpen: root.settingsOpen
+            notificationOpen: root.notificationOpen
+            notificationCount: root.notificationCount
+            onRequested: function(anchorItem) { root.settingsRequested(anchorItem); }
+            onNotificationsRequested: function(anchorItem) { root.notificationsRequested(anchorItem); }
+        }
+    }
 }

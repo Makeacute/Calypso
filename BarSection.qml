@@ -9,6 +9,8 @@ Surface {
     property var panelWindow
     property var osd
     property var tooltipHost
+    property int notificationCount: 0
+    property bool notificationOpen: false
     property var modules: []
     property bool active: true
     property bool backgroundReady: true
@@ -19,6 +21,7 @@ Surface {
     readonly property bool hasContent: contentRow.implicitWidth > 0
 
     signal settingsRequested(var anchorItem)
+    signal notificationsRequested(var anchorItem)
     signal clockRequested(var anchorItem)
     signal controlsRequested(var anchorItem)
     signal moduleDetailsRequested(string moduleName, var anchorItem)
@@ -66,12 +69,15 @@ Surface {
                 panelWindow: root.panelWindow
                 osd: root.osd
                 tooltipHost: root.tooltipHost
+                notificationCount: root.notificationCount
+                notificationOpen: root.notificationOpen
                 moduleName: String(root.moduleList[index])
                 active: root.active
                 backgroundReady: root.backgroundReady
                 interactionReady: root.interactionReady
                 settingsOpen: root.settingsOpen
                 onSettingsRequested: function(anchorItem) { root.settingsRequested(anchorItem); }
+                onNotificationsRequested: function(anchorItem) { root.notificationsRequested(anchorItem); }
                 onClockRequested: function(anchorItem) { root.clockRequested(anchorItem); }
                 onControlsRequested: function(anchorItem) { root.controlsRequested(anchorItem); }
                 onModuleDetailsRequested: function(moduleName, anchorItem) { root.moduleDetailsRequested(moduleName, anchorItem); }

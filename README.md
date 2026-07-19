@@ -62,7 +62,7 @@ When `wallpaperApplyColors` and `matugenEnabled` are true, Calypso runs `matugen
 
 ## Notifications
 
-`SettingsButton.qml` uses Quickshell's notification service to track non-transient desktop notifications and shows a small badge on the settings button while notifications are present. The badge is count-only; Calypso does not render notification popups.
+`Bar.qml` owns a Quickshell notification service for non-transient desktop notifications. `SettingsButton.qml` shows the queue badge, and the badge/right-click path opens a notification drawer with app grouping, notification bodies/images, dismiss controls, and app-provided action buttons.
 
 ## Adding A Widget
 
@@ -116,6 +116,8 @@ Widget options:
 - `notepadPanelWidth`, `notepadFilePath`, `notepadAutosaveMs`
 - `clipboardPanelWidth`, `clipboardBackend`, `clipboardMaxItems`
 - `processPanelWidth`, `processListLimit`, `polling.processListMs`
+- `notificationsPanelWidth`, `notificationsMaxVisible`, `notificationsGroupByApp`, `notificationsGroupsExpanded`
+- `notificationsShowBody`, `notificationsShowImages`, `notificationsShowActions`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`

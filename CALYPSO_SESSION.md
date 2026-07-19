@@ -509,3 +509,49 @@ Date: 2026-07-19
 - Temporarily tested `barStyle` `islands`/`solid`/`pill` and `barPosition` `top`/`bottom`, restored `settings.json`, and captured `/tmp/calypso-phase45-layout-matrix.png`; full-width bottom checks include `/tmp/calypso-phase45-islands-bottom-fullwidth-slow.png` and `/tmp/calypso-phase45-pill-bottom-fullscreen-slow.png`.
 - Idle CPU samples on PID `4786`: noisy pre-cache/pre-event-fix samples were `5.187%`, `2.068%`, and `3.508%` of one core; final post-cache/post-event-fix sample was `0.920s` CPU over `60.443s`, `1.522%` of one core, with the ending `top` line at `0.0%`.
 - Final log window had no Calypso/QML warnings or errors.
+
+## Phase 5 Notification Drawer
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `BarSection.qml`
+- `ModuleHost.qml`
+- `NotificationPanel.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `widgets/SettingsButton.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Moved notification tracking to a shared `NotificationServer` in `Bar.qml`, keeping the settings button as the count badge/trigger instead of a second notification owner.
+- Added `NotificationPanel.qml`, a separate notification drawer with app grouping, expand/collapse state, notification bodies, optional images, dismiss buttons, and app-provided action buttons via `NotificationAction.invoke()`.
+- Added badge/right-click notification access from `SettingsButton.qml` while preserving normal left-click settings behavior.
+- Added notification drawer settings for width, max cards, grouping, default expansion, body rendering, image rendering, and action rendering.
+- Added `openNotifications` and `closeNotifications` IPC helpers for verification and future keybind use.
+
+### Decisions Made
+
+- Kept notifications as their own drawer, separate from the Phase 3 dashboard.
+- Kept the drawer lazy-loaded in the interaction phase; only the notification service itself is always present so the badge count stays live.
+- Used Quickshell 0.3.0's existing notification action API instead of adding a helper daemon or external notification history dependency.
+- Kept body markup disabled and rendered bodies as plain text to avoid unsafe/unexpected markup handling.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Confirmed local Quickshell notification metadata exposes `NotificationAction.invoke()`, body, image, app, urgency, and dismiss APIs.
+- Triggered three real DBus notifications with `busctl`: two from `Calypso Mail` and one from `Calypso Chat`; the drawer grouped the mail notifications and rendered action buttons for actionable notifications.
+- Captured empty drawer screenshot at `/tmp/calypso-phase5-notifications-empty.png`.
+- Captured grouped/action drawer screenshot at `/tmp/calypso-phase5-notifications-grouped-final.png`.
+- Captured layout matrix with the drawer open across `barStyle` `islands`/`solid`/`pill` and `barPosition` `top`/`bottom` at `/tmp/calypso-phase5-layout-matrix.png`, then restored the user's `solid`/`top` settings.
+- Recorded drawer open motion via IPC-triggered screen frames assembled with `ffmpeg`: `/tmp/calypso-phase5-notification-drawer-motion.mp4`; reviewed contact sheet `/tmp/calypso-phase5-notification-drawer-motion-contact.png`.
+- Recorded reduce-motion drawer open check at `/tmp/calypso-phase5-notification-drawer-reduce-motion.mp4`; reviewed `/tmp/calypso-phase5-notification-drawer-reduce-motion-contact.png` and confirmed the drawer appears without the normal eased slide.
+- Idle CPU sample with notification drawer closed on PID `4786`: `0.860s` CPU over `60.000s`, `1.433%` of one core.
+- Idle CPU sample with notification drawer open on PID `4786`: `0.880s` CPU over `60.000s`, `1.467%` of one core.
+- Fixed a transient delegate-width binding warning in `NotificationPanel.qml`; the fresh final log tail had no Calypso/QML warnings or errors.

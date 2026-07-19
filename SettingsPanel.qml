@@ -1274,6 +1274,21 @@ PopupWindow {
                 width: parent.width
                 theme: root.theme
                 settings: root.settings
+                title: "Notifications"
+
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Group by app"; checked: settings.notificationsGroupByApp; onToggled: function(checked) { settings.setValue("notificationsGroupByApp", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Groups expanded"; checked: settings.notificationsGroupsExpanded; onToggled: function(checked) { settings.setValue("notificationsGroupsExpanded", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Bodies"; checked: settings.notificationsShowBody; onToggled: function(checked) { settings.setValue("notificationsShowBody", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Images"; checked: settings.notificationsShowImages; onToggled: function(checked) { settings.setValue("notificationsShowImages", checked); } }
+                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Actions"; checked: settings.notificationsShowActions; onToggled: function(checked) { settings.setValue("notificationsShowActions", checked); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Drawer width"; value: settings.notificationsPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("notificationsPanelWidth", value, minimum, maximum); } }
+                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Max cards"; value: settings.notificationsMaxVisible; minimum: 6; maximum: 80; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("notificationsMaxVisible", value, minimum, maximum); } }
+            }
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
                 title: "System"
 
                 ChoiceRow {
