@@ -10,7 +10,9 @@ PanelWindow {
     id: bar
 
     required property var modelData
-    readonly property bool settingsOpen: settingsPanel.visible
+    readonly property bool settingsOpen: settingsPanelLoader.item ? settingsPanelLoader.item.visible : false
+    property bool backgroundPhaseReady: false
+    property bool interactionPhaseReady: false
     property bool startupComplete: false
     property bool barHovered: false
     property int lastWorkspaceId: -1
@@ -27,46 +29,68 @@ PanelWindow {
                     .concat(Array.from(settings.rightModules || []));
     }
 
+    function ensureInteractionPhase() {
+        interactionPhaseReady = true;
+    }
+
+    function closeLoadedPanel(loader) {
+        const item = loader.item;
+        if (item && typeof item.close === "function")
+            item.close();
+    }
+
     function showSettings(anchorItem) {
-        clockPanel.close();
-        controlCenterPanel.close();
-        moduleDetailsPanel.close();
-        settingsPanel.toggle(anchorItem);
+        ensureInteractionPhase();
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        if (settingsPanelLoader.item)
+            settingsPanelLoader.item.toggle(anchorItem);
     }
 
     function showClock(anchorItem) {
-        settingsPanel.close();
-        controlCenterPanel.close();
-        moduleDetailsPanel.close();
-        clockPanel.toggle(anchorItem);
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        if (clockPanelLoader.item)
+            clockPanelLoader.item.toggle(anchorItem);
     }
 
     function showControls(anchorItem) {
-        settingsPanel.close();
-        clockPanel.close();
-        moduleDetailsPanel.close();
-        controlCenterPanel.toggle(anchorItem);
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        if (controlCenterPanelLoader.item)
+            controlCenterPanelLoader.item.toggle(anchorItem);
     }
 
     function showModuleDetails(moduleName, anchorItem) {
-        settingsPanel.close();
-        clockPanel.close();
-        controlCenterPanel.close();
-        moduleDetailsPanel.toggle(moduleName, anchorItem);
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(controlCenterPanelLoader);
+        if (moduleDetailsPanelLoader.item)
+            moduleDetailsPanelLoader.item.toggle(moduleName, anchorItem);
     }
 
     function openSettingsPage(page) {
-        clockPanel.close();
-        controlCenterPanel.close();
-        moduleDetailsPanel.close();
-        settingsPanel.openPage(page);
+        ensureInteractionPhase();
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(controlCenterPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        if (settingsPanelLoader.item)
+            settingsPanelLoader.item.openPage(page);
     }
 
     function openModuleDetails(moduleName) {
-        settingsPanel.close();
-        clockPanel.close();
-        controlCenterPanel.close();
-        moduleDetailsPanel.open(moduleName, null);
+        ensureInteractionPhase();
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(controlCenterPanelLoader);
+        if (moduleDetailsPanelLoader.item)
+            moduleDetailsPanelLoader.item.open(moduleName, null);
     }
 
     IpcHandler {
@@ -77,7 +101,7 @@ PanelWindow {
         }
 
         function closeSettings(): void {
-            settingsPanel.close();
+            bar.closeLoadedPanel(settingsPanelLoader);
         }
 
         function openClock(): void {
@@ -85,7 +109,7 @@ PanelWindow {
         }
 
         function closeClock(): void {
-            clockPanel.close();
+            bar.closeLoadedPanel(clockPanelLoader);
         }
 
         function openControls(): void {
@@ -93,7 +117,7 @@ PanelWindow {
         }
 
         function closeControls(): void {
-            controlCenterPanel.close();
+            bar.closeLoadedPanel(controlCenterPanelLoader);
         }
 
         function openSettingsPage(page: string): void {
@@ -101,27 +125,34 @@ PanelWindow {
         }
 
         function openSettingsDetail(moduleName: string): void {
-            clockPanel.close();
-            controlCenterPanel.close();
-            moduleDetailsPanel.close();
-            settingsPanel.openModuleOptions(moduleName);
+            bar.ensureInteractionPhase();
+            bar.closeLoadedPanel(clockPanelLoader);
+            bar.closeLoadedPanel(controlCenterPanelLoader);
+            bar.closeLoadedPanel(moduleDetailsPanelLoader);
+            if (settingsPanelLoader.item)
+                settingsPanelLoader.item.openModuleOptions(moduleName);
         }
 
         function showOsd(kind: string, value: real): void {
+            bar.ensureInteractionPhase();
             const type = String(kind || "volume");
             const allowed = ["volume", "mute", "brightness", "keyboard", "media", "battery"];
             if (allowed.indexOf(type) < 0) return;
             const amount = Math.max(0, Math.min(1, Number(value) || 0.72));
             const icon = type === "brightness" ? "󰃠" : type === "keyboard" ? "󰌌" : type === "media" ? "󰝚" : type === "battery" ? "󰁹" : "󰕾";
-            osd.show(icon, amount, type, type.charAt(0).toUpperCase() + type.slice(1));
+            if (osdLoader.item)
+                osdLoader.item.show(icon, amount, type, type.charAt(0).toUpperCase() + type.slice(1));
         }
 
         function showTooltip(text: string): void {
-            tooltipHost.show(text, null);
+            bar.ensureInteractionPhase();
+            if (tooltipHostLoader.item)
+                tooltipHostLoader.item.show(text, null);
         }
 
         function hideTooltip(): void {
-            tooltipHost.hide();
+            if (tooltipHostLoader.item)
+                tooltipHostLoader.item.hide();
         }
 
         function openModule(moduleName: string): void {
@@ -129,26 +160,34 @@ PanelWindow {
         }
 
         function openModuleTab(moduleName: string, tabName: string): void {
-            settingsPanel.close();
-            clockPanel.close();
-            controlCenterPanel.close();
-            moduleDetailsPanel.openTab(moduleName, tabName, null);
+            bar.ensureInteractionPhase();
+            bar.closeLoadedPanel(settingsPanelLoader);
+            bar.closeLoadedPanel(clockPanelLoader);
+            bar.closeLoadedPanel(controlCenterPanelLoader);
+            if (moduleDetailsPanelLoader.item)
+                moduleDetailsPanelLoader.item.openTab(moduleName, tabName, null);
         }
 
         function closeModule(): void {
-            moduleDetailsPanel.close();
+            bar.closeLoadedPanel(moduleDetailsPanelLoader);
         }
 
         function randomWallpaper(): void {
-            settingsPanel.applyRandomWallpaper();
+            bar.ensureInteractionPhase();
+            if (settingsPanelLoader.item)
+                settingsPanelLoader.item.applyRandomWallpaper();
         }
 
         function previewWallpaper(path: string): void {
-            settingsPanel.openWallpaperPreview(path);
+            bar.ensureInteractionPhase();
+            if (settingsPanelLoader.item)
+                settingsPanelLoader.item.openWallpaperPreview(path);
         }
 
         function applyWallpaper(path: string): void {
-            settingsPanel.applyWallpaperPath(path);
+            bar.ensureInteractionPhase();
+            if (settingsPanelLoader.item)
+                settingsPanelLoader.item.applyWallpaperPath(path);
         }
 
         function setBarStyle(value: string): void {
@@ -224,7 +263,8 @@ PanelWindow {
 
         if (startupComplete && id !== lastWorkspaceId) {
             const label = "Workspace " + String(workspace.label || workspace.index || id);
-            workspaceToast.show(label);
+            if (workspaceToastLoader.item)
+                workspaceToastLoader.item.show(label);
         }
 
         lastWorkspaceId = id;
@@ -324,10 +364,12 @@ PanelWindow {
                 settings: settings
                 compositor: compositor
                 panelWindow: bar
-                osd: osd
-                tooltipHost: tooltipHost
+                osd: osdLoader.item
+                tooltipHost: tooltipHostLoader.item
                 modules: settings.leftModules
                 active: settings.barStyle === "islands" || leftSection.opacity > 0
+                backgroundReady: bar.backgroundPhaseReady
+                interactionReady: bar.interactionPhaseReady
                 settingsOpen: bar.settingsOpen
                 contentAlignment: "left"
                 visible: leftSection.hasContent && (settings.barStyle === "islands" || opacity > 0)
@@ -347,10 +389,12 @@ PanelWindow {
                 settings: settings
                 compositor: compositor
                 panelWindow: bar
-                osd: osd
-                tooltipHost: tooltipHost
+                osd: osdLoader.item
+                tooltipHost: tooltipHostLoader.item
                 modules: settings.centerModules
                 active: settings.barStyle === "islands" || centerSection.opacity > 0
+                backgroundReady: bar.backgroundPhaseReady
+                interactionReady: bar.interactionPhaseReady
                 settingsOpen: bar.settingsOpen
                 contentAlignment: "center"
                 visible: centerSection.hasContent && (settings.barStyle === "islands" || opacity > 0)
@@ -371,10 +415,12 @@ PanelWindow {
                 settings: settings
                 compositor: compositor
                 panelWindow: bar
-                osd: osd
-                tooltipHost: tooltipHost
+                osd: osdLoader.item
+                tooltipHost: tooltipHostLoader.item
                 modules: settings.rightModules
                 active: settings.barStyle === "islands" || rightSection.opacity > 0
+                backgroundReady: bar.backgroundPhaseReady
+                interactionReady: bar.interactionPhaseReady
                 settingsOpen: bar.settingsOpen
                 contentAlignment: "right"
                 visible: rightSection.hasContent && (settings.barStyle === "islands" || opacity > 0)
@@ -417,10 +463,12 @@ PanelWindow {
                         settings: settings
                         compositor: compositor
                         panelWindow: bar
-                        osd: osd
-                        tooltipHost: tooltipHost
+                        osd: osdLoader.item
+                        tooltipHost: tooltipHostLoader.item
                         modules: settings.leftModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
+                        backgroundReady: bar.backgroundPhaseReady
+                        interactionReady: bar.interactionPhaseReady
                         settingsOpen: bar.settingsOpen
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -437,10 +485,12 @@ PanelWindow {
                         settings: settings
                         compositor: compositor
                         panelWindow: bar
-                        osd: osd
-                        tooltipHost: tooltipHost
+                        osd: osdLoader.item
+                        tooltipHost: tooltipHostLoader.item
                         modules: settings.centerModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
+                        backgroundReady: bar.backgroundPhaseReady
+                        interactionReady: bar.interactionPhaseReady
                         settingsOpen: bar.settingsOpen
                         anchors.verticalCenter: parent.verticalCenter
                         x: Math.round((parent.width - width) / 2)
@@ -457,10 +507,12 @@ PanelWindow {
                         settings: settings
                         compositor: compositor
                         panelWindow: bar
-                        osd: osd
-                        tooltipHost: tooltipHost
+                        osd: osdLoader.item
+                        tooltipHost: tooltipHostLoader.item
                         modules: settings.rightModules
                         active: settings.barStyle === "solid" || solidSurface.opacity > 0
+                        backgroundReady: bar.backgroundPhaseReady
+                        interactionReady: bar.interactionPhaseReady
                         settingsOpen: bar.settingsOpen
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
@@ -505,10 +557,12 @@ PanelWindow {
                     settings: settings
                     compositor: compositor
                     panelWindow: bar
-                    osd: osd
-                    tooltipHost: tooltipHost
+                    osd: osdLoader.item
+                    tooltipHost: tooltipHostLoader.item
                     modules: bar.combinedModules()
                     active: settings.barStyle === "pill" || pillSurface.opacity > 0
+                    backgroundReady: bar.backgroundPhaseReady
+                    interactionReady: bar.interactionPhaseReady
                     settingsOpen: bar.settingsOpen
                     anchors.centerIn: parent
                     onSettingsRequested: function(anchorItem) { bar.showSettings(anchorItem); }
@@ -524,61 +578,114 @@ PanelWindow {
         onHoveredChanged: bar.barHovered = hovered
     }
 
-    SettingsPanel {
-        id: settingsPanel
+    Loader {
+        id: settingsPanelLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
-        osd: osd
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            SettingsPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+                osd: osdLoader.item
+            }
+        }
     }
 
-    ClockPanel {
-        id: clockPanel
+    Loader {
+        id: clockPanelLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            ClockPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
     }
 
-    ControlCenterPanel {
-        id: controlCenterPanel
+    Loader {
+        id: controlCenterPanelLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            ControlCenterPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
     }
 
-    ModuleDetailsPanel {
-        id: moduleDetailsPanel
+    Loader {
+        id: moduleDetailsPanelLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            ModuleDetailsPanel {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
     }
 
-    Osd {
-        id: osd
+    Loader {
+        id: osdLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            Osd {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
     }
 
-    WorkspaceToast {
-        id: workspaceToast
+    Loader {
+        id: workspaceToastLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            WorkspaceToast {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
     }
 
-    TooltipHost {
-        id: tooltipHost
+    Loader {
+        id: tooltipHostLoader
 
-        theme: theme
-        settings: settings
-        panelWindow: bar
+        active: bar.interactionPhaseReady
+        sourceComponent: Component {
+            TooltipHost {
+                theme: theme
+                settings: settings
+                panelWindow: bar
+            }
+        }
+    }
+
+    Timer {
+        id: backgroundPhaseTimer
+
+        interval: 300
+        running: true
+        repeat: false
+        onTriggered: bar.backgroundPhaseReady = true
+    }
+
+    Timer {
+        id: interactionPhaseTimer
+
+        interval: 600
+        running: true
+        repeat: false
+        onTriggered: bar.interactionPhaseReady = true
     }
 
     Connections {
@@ -602,6 +709,8 @@ PanelWindow {
         property var tooltipHost
         property var modules: []
         property bool active: true
+        property bool backgroundReady: true
+        property bool interactionReady: true
         property bool settingsOpen: false
         readonly property var moduleList: Array.from(modules || [])
 
@@ -633,6 +742,8 @@ PanelWindow {
                 tooltipHost: strip.tooltipHost
                 moduleName: String(strip.moduleList[index])
                 active: strip.active
+                backgroundReady: strip.backgroundReady
+                interactionReady: strip.interactionReady
                 settingsOpen: strip.settingsOpen
                 onSettingsRequested: function(anchorItem) { strip.settingsRequested(anchorItem); }
                 onClockRequested: function(anchorItem) { strip.clockRequested(anchorItem); }

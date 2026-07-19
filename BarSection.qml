@@ -11,6 +11,8 @@ Surface {
     property var tooltipHost
     property var modules: []
     property bool active: true
+    property bool backgroundReady: true
+    property bool interactionReady: true
     property bool settingsOpen: false
     property string contentAlignment: "center"
     readonly property var moduleList: Array.from(modules || [])
@@ -66,6 +68,8 @@ Surface {
                 tooltipHost: root.tooltipHost
                 moduleName: String(root.moduleList[index])
                 active: root.active
+                backgroundReady: root.backgroundReady
+                interactionReady: root.interactionReady
                 settingsOpen: root.settingsOpen
                 onSettingsRequested: function(anchorItem) { root.settingsRequested(anchorItem); }
                 onClockRequested: function(anchorItem) { root.clockRequested(anchorItem); }

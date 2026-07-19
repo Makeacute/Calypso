@@ -138,3 +138,34 @@ Date: 2026-07-19
 - Verified tiled Niri window geometry for all bar styles (`islands`, `solid`, `pill`), both positions (`top`, `bottom`), and `barAutohide` on/off. The focused tiled window stayed at `1356x728` in every state, including autohide hidden and shown samples.
 - Captured screenshots for each style/position/autohide combination in `/tmp/calypso-phase0-20260719-134755`.
 - Restarted Quickshell after verification. The fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 0.5 Staged Shell Boot
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Bar.qml`
+- `BarSection.qml`
+- `ModuleHost.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added startup phase gates for bar modules: core modules load immediately, non-core/background modules load after `300ms`, and interaction-only modules load after `600ms`.
+- Converted settings, clock, control center, module details, OSD, workspace toast, and tooltip hosts from eager construction to `Loader { active: false }` surfaces activated by the interaction phase.
+- Added on-demand activation so IPC and early clicks can open late-loaded surfaces before the `600ms` timer fires.
+
+### Decisions Made
+
+- Kept workspaces, focused windows, and clock in the immediate phase so first paint still has compositor context and a useful center section.
+- Delayed settings/controls modules because settings currently owns notification tracking and controls are not needed for first paint.
+
+### Verification
+
+- Baseline daemonized launch elapsed time: `3628ms` in `/tmp/calypso-phase05-baseline-20260719-140954`.
+- After staged loading, daemonized launch elapsed time: `3345ms` in `/tmp/calypso-phase05-after-20260719-141534`.
+- Verified late-loaded SettingsPanel and OSD through IPC screenshots at `/tmp/calypso-phase05-settings.png` and `/tmp/calypso-phase05-osd.png`.
+- Validated `settings.json` with `python3 -m json.tool settings.json`.
+- Fully-loaded 60 second idle sample on PID `72488`: `4.360s` CPU time, `7.267%` of one core.
+- Fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
