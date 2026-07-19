@@ -470,5 +470,8 @@
   "workspaceScrollWrap": true,
   "workspaceShowNumbers": true,
   "workspaceShowOccupied": true,
-  "workspaceToastTimeout": 1000
+  "workspaceToastTimeout": 1000,
+  "fontFamilySans": "DejaVu Sans",
+  "fontFamilyMono": "JetBrainsMono Nerd Font",
+  "fontFamilyIcon": "JetBrainsMono Nerd Font"
 }

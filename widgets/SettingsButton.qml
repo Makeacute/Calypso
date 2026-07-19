@@ -66,7 +66,7 @@ Pill {
             visible: root.notificationCount > 1
             text: root.notificationCount > 99 ? "99+" : String(root.notificationCount)
             color: theme.surface
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilyMono
             font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.65))
             font.weight: Font.DemiBold
         }

@@ -75,7 +75,7 @@ PopupWindow {
             anchors.centerIn: parent
             text: root.tooltipText
             color: theme.textMuted
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilySans
             font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.86))
             font.weight: Font.Medium
         }

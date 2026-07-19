@@ -406,7 +406,7 @@ PopupWindow {
         y: root.panelOpen ? 0 : (settings.barPosition === "bottom" ? theme.spacingM : -theme.spacingM)
         theme: root.theme
         settings: root.settings
-        surfaceColor: theme.alpha(theme.surfacePanel, settings.panelOpacity / 100)
+        surfaceColor: theme.alpha(theme.surfaceContainerHigh, settings.panelOpacity / 100)
         outlineColor: theme.outlineSubtle
         outlineWidth: settings.effectiveBorderWidth
         surfaceRadius: settings.panelRadius
@@ -1436,7 +1436,7 @@ PopupWindow {
         spacing: settings.effectiveContentSpacing
 
         Swatch { theme: paletteRoot.theme; settings: paletteRoot.settings; label: "Accent"; swatchColor: theme.accent }
-        Swatch { theme: paletteRoot.theme; settings: paletteRoot.settings; label: "Surface"; swatchColor: theme.surfacePanel }
+        Swatch { theme: paletteRoot.theme; settings: paletteRoot.settings; label: "Surface"; swatchColor: theme.surfaceContainerHigh }
         Swatch { theme: paletteRoot.theme; settings: paletteRoot.settings; label: "Text"; swatchColor: theme.text }
         Swatch { theme: paletteRoot.theme; settings: paletteRoot.settings; label: "Urgent"; swatchColor: theme.urgent }
     }
@@ -2651,7 +2651,7 @@ PopupWindow {
         implicitHeight: settings.controlHeight + settings.effectiveGroupPadding * 2
         height: visible ? implicitHeight : 0
         radius: settings.effectiveRadiusM
-        color: theme.alpha(theme.surfacePanel, 0.94)
+        color: theme.alpha(theme.surfaceContainerHigh, 0.94)
         border.color: theme.outlineSubtle
         border.width: settings.effectiveBorderWidth
         opacity: visible ? 1 : 0

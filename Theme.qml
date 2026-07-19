@@ -27,23 +27,30 @@ Item {
 
     property color base: hex(palette.base00, "1c1b1c")
     property color mantle: hex(palette.base01, "252426")
-    property color surface: alpha(Qt.lighter(base, 1.22), 0.92)
-    property color surfaceStrong: alpha(Qt.lighter(base, 1.36), 0.96)
+    property color surface: alpha(Qt.lighter(base, 1.18), 0.92)
+    property color surfaceContainer: alpha(Qt.lighter(base, 1.26), 0.94)
+    property color surfaceContainerHigh: alpha(Qt.lighter(base, 1.36), 0.97)
+    property color surfaceStrong: surfaceContainerHigh
     property color surfaceMuted: alpha(Qt.lighter(base, 1.14), 0.58)
+    property color primary: hex(palette.base0D, "90a4c8")
+    property color secondary: hex(palette.base0C, "929292")
+    property color tertiary: hex(palette.base0E, "c678dd")
+    property color error: hex(palette.base08, "e06c75")
     property color surfaceHover: alpha(text, 0.08)
     property color surfacePressed: alpha(text, 0.12)
-    property color surfaceActive: alpha(accent, 0.20)
-    property color surfacePanel: alpha(Qt.lighter(base, 1.30), 0.97)
+    property color surfaceActive: alpha(primary, 0.20)
+    property color surfacePanel: surfaceContainerHigh
     property color borderBase: hex(palette.base03, "777777")
-    property color border: alpha(base, 0.15)
-    property color outlineSubtle: alpha(borderBase, 0.16)
-    property color outlineActive: alpha(accent, 0.36)
+    property color outlineVariant: alpha(borderBase, 0.16)
+    property color border: outlineVariant
+    property color outlineSubtle: outlineVariant
+    property color outlineActive: alpha(primary, 0.36)
     property color text: hex(palette.base05, "c8c8c8")
     property color textMuted: hex(palette.base03, "9a9d99")
-    property color accent: hex(palette.base0D, "90a4c8")
-    property color accentSoft: alpha(accent, 0.24)
-    property color accentSofter: alpha(accent, 0.14)
-    property color urgent: hex(palette.base08, "e06c75")
+    property color accent: primary
+    property color accentSoft: alpha(primary, 0.24)
+    property color accentSofter: alpha(primary, 0.14)
+    property color urgent: error
     property color warning: hex(palette.base0A, "c8b36d")
     property color good: hex(palette.base0B, "9fbf8f")
     property color gloss: alpha(Qt.rgba(1, 1, 1, 1), 0.06)

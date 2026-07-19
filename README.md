@@ -92,7 +92,7 @@ Appearance:
 
 - `barBlur`, `barOpacity`, `barBorderEnabled`, `barBorderThickness`
 - `spacingScale`, `radiusScale`
-- `fontFamily`, `fontSize`, `iconSize`, `trayIconSize`
+- `fontFamily`, `fontFamilySans`, `fontFamilyMono`, `fontFamilyIcon`, `fontSize`, `iconSize`, `trayIconSize`
 - `widgetStyle`
 
 Behavior and motion:

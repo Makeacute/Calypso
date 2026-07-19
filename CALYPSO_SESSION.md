@@ -169,3 +169,47 @@ Date: 2026-07-19
 - Validated `settings.json` with `python3 -m json.tool settings.json`.
 - Fully-loaded 60 second idle sample on PID `72488`: `4.360s` CPU time, `7.267%` of one core.
 - Fresh log had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 1 Tonal Surfaces And Font Roles
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Theme.qml`
+- `Settings.qml`
+- `Surface.qml`
+- `Bar.qml`
+- `ClockPanel.qml`
+- `ControlCenterPanel.qml`
+- `ModuleDetailsPanel.qml`
+- `SettingsPanel.qml`
+- `widgets/Osd.qml`
+- `widgets/Pill.qml`
+- `widgets/SettingsButton.qml`
+- `widgets/TooltipHost.qml`
+- `widgets/Tray.qml`
+- `widgets/Workspace.qml`
+- `widgets/WorkspaceToast.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added explicit tonal roles in `Theme.qml`: `surfaceContainer`, `surfaceContainerHigh`, `primary`, `secondary`, `tertiary`, `outlineVariant`, and `error`, while preserving compatibility aliases such as `accent`, `urgent`, and `surfacePanel`.
+- Added font role settings: `fontFamilySans`, `fontFamilyMono`, and `fontFamilyIcon`, with migration fallback to the existing `fontFamily`.
+- Updated shared bar pills, OSD, clock hero text, module detail hero/value cards, tooltips, workspace labels, and notification badge text to use role-specific fonts.
+- Moved elevated panel/card surfaces toward `surfaceContainer` and `surfaceContainerHigh` tokens.
+
+### Decisions Made
+
+- Kept legacy `settings.fontFamily` mapped to the original blanket font so unpatched glyph-heavy call sites remain compatible during the role migration.
+- Used `DejaVu Sans` as the default Sans role because `Inter` is not installed on this system; kept `JetBrainsMono Nerd Font` for Mono and Icon roles.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Restarted Quickshell and captured normal render screenshot at `/tmp/calypso-phase1-normal.png`.
+- Temporarily removed `palette.json`, restarted Quickshell, confirmed fallback render, captured `/tmp/calypso-phase1-palette-fallback.png`, then restored `palette.json`.
+- Fresh logs had no Calypso/QML warnings; only the known external Qt portal registration warning remained.

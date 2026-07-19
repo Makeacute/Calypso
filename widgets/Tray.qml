@@ -124,7 +124,7 @@ Row {
             width: Math.max(settings.moduleHeight + settings.effectivePillPadding * 2, overflowColumn.implicitWidth + settings.effectivePillPadding * 2)
             height: overflowColumn.implicitHeight + settings.effectivePillPadding * 2
             radius: settings.effectiveRadiusL
-            color: theme.alpha(theme.surfacePanel, settings.barOpacity)
+            color: theme.alpha(theme.surfaceContainerHigh, settings.barOpacity)
             border.color: settings.barBorderEnabled ? theme.border : theme.outlineSubtle
             border.width: settings.barBorderEnabled ? settings.barBorderThickness : 1
             opacity: root.overflowOpen ? 1 : 0

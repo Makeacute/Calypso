@@ -348,7 +348,7 @@ PopupWindow {
         height: implicitHeight
         theme: root.theme
         settings: root.settings
-        surfaceColor: theme.alpha(theme.surfacePanel, settings.panelOpacity / 100)
+        surfaceColor: theme.alpha(theme.surfaceContainerHigh, settings.panelOpacity / 100)
         outlineColor: theme.outlineSubtle
         outlineWidth: Math.max(1, Math.round(settings.effectiveGroupPadding * 0.25))
         surfaceRadius: settings.panelRadius
@@ -918,7 +918,7 @@ PopupWindow {
                     anchors.centerIn: parent
                     text: gauge.icon
                     color: gauge.accentColor
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilyIcon
                     font.pixelSize: settings.effectiveIconSize
                 }
             }
@@ -932,7 +932,7 @@ PopupWindow {
                     text: gauge.title
                     color: theme.text
                     elide: Text.ElideRight
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilySans
                     font.pixelSize: settings.effectiveFontSize
                     font.weight: Font.DemiBold
                 }
@@ -942,7 +942,7 @@ PopupWindow {
                     text: gauge.valueText
                     color: gauge.accentColor
                     elide: Text.ElideRight
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilyMono
                     font.pixelSize: Math.round(settings.effectiveFontSize * 1.55)
                     font.weight: Font.Bold
                 }
@@ -960,7 +960,7 @@ PopupWindow {
                     text: gauge.subText
                     color: theme.textMuted
                     elide: Text.ElideRight
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilySans
                     font.pixelSize: Math.max(9, settings.effectiveFontSize - 2)
                 }
             }
@@ -988,7 +988,7 @@ PopupWindow {
                 height: parent.height
                 text: metric.icon
                 color: theme.accent
-                font.family: settings.fontFamily
+                font.family: settings.fontFamilyIcon
                 font.pixelSize: settings.effectiveIconSize
                 verticalAlignment: Text.AlignVCenter
             }
@@ -997,8 +997,8 @@ PopupWindow {
                 width: parent.width - settings.effectiveIconSize - parent.spacing
                 spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.2))
 
-                Text { width: parent.width; text: metric.label; color: theme.textMuted; elide: Text.ElideRight; font.family: settings.fontFamily; font.pixelSize: Math.max(9, settings.effectiveFontSize - 2) }
-                Text { width: parent.width; text: metric.value; color: theme.text; elide: Text.ElideRight; font.family: settings.fontFamily; font.pixelSize: settings.effectiveFontSize; font.weight: Font.DemiBold }
+                Text { width: parent.width; text: metric.label; color: theme.textMuted; elide: Text.ElideRight; font.family: settings.fontFamilySans; font.pixelSize: Math.max(9, settings.effectiveFontSize - 2) }
+                Text { width: parent.width; text: metric.value; color: theme.text; elide: Text.ElideRight; font.family: settings.fontFamilyMono; font.pixelSize: settings.effectiveFontSize; font.weight: Font.DemiBold }
             }
         }
     }
@@ -1009,7 +1009,7 @@ PopupWindow {
 
         implicitHeight: childrenRect.height + settings.effectivePillPadding * 2
         radius: settings.effectivePillRadius
-        color: theme.alpha(theme.text, 0.035)
+        color: theme.alpha(theme.surfaceContainer, 0.46)
         border.color: theme.outlineSubtle
         border.width: Math.max(1, Math.round(settings.effectiveGroupPadding * 0.25))
         antialiasing: true
@@ -1020,7 +1020,7 @@ PopupWindow {
         property var settings
 
         color: theme.text
-        font.family: settings.fontFamily
+        font.family: settings.fontFamilySans
         font.pixelSize: settings.effectiveFontSize
         font.weight: Font.DemiBold
     }
@@ -1071,7 +1071,7 @@ PopupWindow {
             text: usageRow.label
             color: theme.text
             elide: Text.ElideRight
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilySans
             font.pixelSize: settings.effectiveFontSize
         }
 
@@ -1084,7 +1084,7 @@ PopupWindow {
             text: usageRow.valueText
             color: theme.textMuted
             horizontalAlignment: Text.AlignRight
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilyMono
             font.pixelSize: settings.effectiveFontSize
             font.weight: Font.DemiBold
         }

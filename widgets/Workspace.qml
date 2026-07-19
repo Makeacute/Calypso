@@ -327,7 +327,7 @@ Item {
                     visible: text.length > 0
                     color: workspacePill.urgent ? theme.urgent : workspacePill.focused ? theme.text : theme.textMuted
                     opacity: workspacePill.urgent || workspacePill.focused ? 1 : 0.55
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilyMono
                     font.pixelSize: settings.effectiveFontSize
                     font.weight: workspacePill.focused ? Font.Bold : Font.Medium
                     horizontalAlignment: Text.AlignHCenter

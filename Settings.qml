@@ -548,6 +548,9 @@ Item {
     property bool performanceMode: adapter.performanceMode
     property int animationBaseMs: adapter.animationMs
     property int animationMs: reduceMotion || performanceMode ? 0 : adapter.animationMs
+    property string fontFamilySans: adapter.fontFamilySans && adapter.fontFamilySans.length > 0 ? adapter.fontFamilySans : adapter.fontFamily
+    property string fontFamilyMono: adapter.fontFamilyMono && adapter.fontFamilyMono.length > 0 ? adapter.fontFamilyMono : fontFamilySans
+    property string fontFamilyIcon: adapter.fontFamilyIcon && adapter.fontFamilyIcon.length > 0 ? adapter.fontFamilyIcon : fontFamilySans
     property string fontFamily: adapter.fontFamily
     property int fontSize: adapter.fontSize
     property int iconSize: adapter.iconSize
@@ -755,6 +758,9 @@ Item {
             property int panelOpacity: 97
             property bool blurEnabled: false
             property string fontFamily: "JetBrainsMono Nerd Font"
+            property string fontFamilySans: "DejaVu Sans"
+            property string fontFamilyMono: "JetBrainsMono Nerd Font"
+            property string fontFamilyIcon: "JetBrainsMono Nerd Font"
             property int fontSize: 12
             property int iconSize: 16
             property int trayIconSize: 16

@@ -105,6 +105,10 @@ Rectangle {
         return hoverEffect === "scale" ? 1.015 : 1;
     }
 
+    function textFontFamily(value) {
+        return /[0-9%./:+-]/.test(String(value || "")) ? settings.fontFamilyMono : settings.fontFamilySans;
+    }
+
     implicitWidth: Math.max(minimumWidth, content.implicitWidth + (compact ? settings.effectivePillPadding : settings.effectivePillPadding * 2))
     implicitHeight: settings.moduleHeight
     width: implicitWidth
@@ -225,7 +229,7 @@ Rectangle {
                                : root.selected ? root.accentColor
                                              : root.muted ? theme.textMuted : theme.text
             opacity: root.iconFadeOpacity * root.iconPulseOpacity
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilyIcon
             font.pixelSize: settings.effectiveIconSize
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignHCenter
@@ -269,7 +273,7 @@ Rectangle {
                     width: parent.width
                     text: root.shownText
                     color: root.danger || root.urgent ? theme.urgent : root.muted ? theme.textMuted : theme.text
-                    font.family: settings.fontFamily
+                    font.family: root.textFontFamily(root.shownText)
                     font.pixelSize: root.shownDetailText.length > 0 ? Math.max(9, Math.round(settings.effectiveFontSize * 0.92)) : settings.effectiveFontSize
                     font.weight: root.selected ? Font.DemiBold : Font.Medium
                     elide: Text.ElideRight
@@ -288,7 +292,7 @@ Rectangle {
                     text: root.shownDetailText
                     color: root.muted ? theme.alpha(theme.textMuted, 0.72) : theme.textMuted
                     opacity: root.shownDetailText.length > 0 ? 1 : 0
-                    font.family: settings.fontFamily
+                    font.family: root.textFontFamily(root.shownDetailText)
                     font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.72))
                     font.weight: Font.Medium
                     elide: Text.ElideRight

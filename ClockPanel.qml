@@ -194,7 +194,7 @@ PopupWindow {
         implicitHeight: height
         theme: root.theme
         settings: root.settings
-        surfaceColor: theme.alpha(theme.surfacePanel, settings.panelOpacity / 100)
+        surfaceColor: theme.alpha(theme.surfaceContainerHigh, settings.panelOpacity / 100)
         outlineColor: theme.outlineSubtle
         outlineWidth: Math.max(1, Math.round(settings.effectiveGroupPadding * 0.25))
         surfaceRadius: settings.panelRadius
@@ -254,9 +254,9 @@ PopupWindow {
                         width: parent.width
                         text: root.selectedTime()
                         color: theme.text
-                        font.family: settings.fontFamily
-                        font.pixelSize: Math.round(settings.effectiveFontSize * 1.9)
-                        font.weight: Font.DemiBold
+                        font.family: settings.fontFamilyMono
+                        font.pixelSize: Math.round(settings.effectiveFontSize * 2.15)
+                        font.weight: Font.Bold
                     }
 
                     Text {
@@ -264,7 +264,7 @@ PopupWindow {
                         text: root.selectedTitle()
                         color: theme.textMuted
                         elide: Text.ElideRight
-                        font.family: settings.fontFamily
+                        font.family: settings.fontFamilySans
                         font.pixelSize: settings.effectiveFontSize
                     }
                 }
@@ -282,7 +282,7 @@ PopupWindow {
                     color: theme.text
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilySans
                     font.pixelSize: Math.round(settings.effectiveFontSize * 1.12)
                     font.weight: Font.DemiBold
                 }
@@ -494,7 +494,7 @@ PopupWindow {
             anchors.centerIn: parent
             text: button.icon
             color: theme.text
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilyIcon
             font.pixelSize: settings.effectiveIconSize
         }
 
@@ -520,7 +520,7 @@ PopupWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             text: label
             color: theme.textMuted
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilySans
             font.pixelSize: Math.round(settings.effectiveFontSize * 0.82)
             font.weight: Font.Medium
         }
@@ -529,7 +529,7 @@ PopupWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             text: value
             color: theme.text
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilyMono
             font.pixelSize: settings.effectiveFontSize
             font.weight: Font.DemiBold
         }

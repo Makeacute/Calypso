@@ -17,18 +17,18 @@ Rectangle {
     function effectiveSurfaceColor() {
         if (!theme) return "transparent";
 
-        if (surfaceStyle === "solid") return theme.surfaceStrong;
+        if (surfaceStyle === "solid") return theme.surfaceContainerHigh;
         if (surfaceStyle === "outlined") return theme.alpha(surfaceColor, 0.58);
-        if (surfaceStyle === "frosted") return theme.alpha(theme.surfacePanel, settings ? settings.panelOpacity / 100 : 0.94);
+        if (surfaceStyle === "frosted") return theme.alpha(theme.surfaceContainerHigh, settings ? settings.panelOpacity / 100 : 0.94);
         return surfaceColor;
     }
 
     function effectiveOutlineColor() {
         if (!theme) return "transparent";
 
-        if (surfaceStyle === "solid") return theme.alpha(outlineColor, 0.22);
+        if (surfaceStyle === "solid") return theme.alpha(theme.outlineVariant, 0.22);
         if (surfaceStyle === "outlined") return theme.outlineActive;
-        if (surfaceStyle === "frosted") return theme.alpha(theme.border, 0.34);
+        if (surfaceStyle === "frosted") return theme.alpha(theme.outlineVariant, 0.34);
         return outlineColor;
     }
 

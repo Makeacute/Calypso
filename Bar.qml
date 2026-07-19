@@ -327,7 +327,7 @@ PanelWindow {
 
             anchors.fill: parent
             radius: settings.effectiveGroupRadius
-            color: settings.effectiveBlurEnabled ? theme.alpha(theme.surfacePanel, 0.16) : theme.transparent
+            color: settings.effectiveBlurEnabled ? theme.alpha(theme.surfaceContainerHigh, 0.16) : theme.transparent
             antialiasing: true
 
             Behavior on color {

@@ -252,7 +252,7 @@ PanelWindow {
         x: root.surfaceX(width)
         y: root.surfaceY(height) + (1 - root.reveal) * (settings && (settings.osdPosition === "bottomCenter" || settings.osdPosition === "bottomRight") ? slideDistance : -slideDistance)
         radius: pill.vertical ? Math.min(width / 2, Math.round(settings.effectiveRadiusXL)) : settings.effectiveRadiusL
-        color: theme.alpha(theme.surfacePanel, settings.osdOpacity)
+        color: theme.alpha(theme.surfaceContainerHigh, settings.osdOpacity)
         border.color: settings.barBorderEnabled ? theme.border : theme.outlineSubtle
         border.width: settings.barBorderEnabled ? settings.barBorderThickness : settings.effectiveBorderWidth
         opacity: root.reveal
@@ -277,9 +277,9 @@ PanelWindow {
                 text: Math.round(root.osdValue * 100) + "%"
                 color: theme.textMuted
                 horizontalAlignment: Text.AlignHCenter
-                font.family: settings.fontFamily
-                font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.8))
-                font.weight: Font.DemiBold
+                font.family: settings.fontFamilyMono
+                font.pixelSize: Math.max(9, Math.round(settings.effectiveFontSize * 0.92))
+                font.weight: Font.Bold
             }
 
             Rectangle {
@@ -321,7 +321,7 @@ PanelWindow {
                 text: root.osdIcon
                 color: root.osdType === "mute" ? theme.textMuted : theme.accent
                 horizontalAlignment: Text.AlignHCenter
-                font.family: settings.fontFamily
+                font.family: settings.fontFamilyIcon
                 font.pixelSize: settings.effectiveIconSize
             }
         }
@@ -340,7 +340,7 @@ PanelWindow {
                 color: root.osdType === "mute" ? theme.textMuted : theme.accent
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
-                font.family: settings.fontFamily
+                font.family: settings.fontFamilyIcon
                 font.pixelSize: settings.effectiveIconSize
             }
 
@@ -356,7 +356,7 @@ PanelWindow {
                     text: root.defaultLabel()
                     color: theme.text
                     elide: Text.ElideRight
-                    font.family: settings.fontFamily
+                    font.family: settings.fontFamilySans
                     font.pixelSize: settings.effectiveFontSize
                     font.weight: Font.DemiBold
                 }
@@ -389,9 +389,9 @@ PanelWindow {
                 color: theme.textMuted
                 horizontalAlignment: Text.AlignRight
                 verticalAlignment: Text.AlignVCenter
-                font.family: settings.fontFamily
-                font.pixelSize: settings.effectiveFontSize
-                font.weight: Font.DemiBold
+                font.family: settings.fontFamilyMono
+                font.pixelSize: Math.round(settings.effectiveFontSize * 1.08)
+                font.weight: Font.Bold
             }
         }
     }

@@ -61,7 +61,7 @@ PanelWindow {
            ? parent.height - height - settings.screenMargin - settings.barHeight - settings.effectiveSpacingM - (1 - root.reveal) * settings.effectiveSpacingM
            : settings.screenMargin + settings.barHeight + settings.effectiveSpacingM + (1 - root.reveal) * settings.effectiveSpacingM
         radius: settings.effectivePillRadius
-        color: theme.alpha(theme.surfacePanel, settings.barOpacity)
+        color: theme.alpha(theme.surfaceContainerHigh, settings.barOpacity)
         border.color: theme.outlineSubtle
         border.width: Math.max(1, Math.round(settings.effectiveGroupPadding * 0.25))
         opacity: root.reveal
@@ -74,7 +74,7 @@ PanelWindow {
             anchors.centerIn: parent
             text: root.label
             color: theme.text
-            font.family: settings.fontFamily
+            font.family: settings.fontFamilySans
             font.pixelSize: settings.effectiveFontSize
             font.weight: Font.DemiBold
         }

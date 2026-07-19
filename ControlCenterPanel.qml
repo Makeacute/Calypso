@@ -88,7 +88,7 @@ PopupWindow {
         height: implicitHeight
         theme: root.theme
         settings: root.settings
-        surfaceColor: theme.alpha(theme.surfacePanel, settings.panelOpacity / 100)
+        surfaceColor: theme.alpha(theme.surfaceContainerHigh, settings.panelOpacity / 100)
         outlineColor: theme.outlineSubtle
         outlineWidth: Math.max(1, Math.round(settings.effectiveGroupPadding * 0.25))
         surfaceRadius: settings.panelRadius
