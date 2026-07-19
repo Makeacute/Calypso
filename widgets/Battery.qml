@@ -21,9 +21,10 @@ Pill {
     detailText: settings.widgetStyle === "expanded" ? timeRemainingText() : ""
     active: charging
     urgent: percent > 0 && percent <= criticalThreshold
-    iconPulseActive: activelyCharging
-    iconPulseMinimumOpacity: 0.65
-    iconPulseDuration: settings.motionBreath
+    accentColor: batteryTone()
+    customContentColor: true
+    contentColor: batteryTone()
+    progressColor: theme.alpha(batteryTone(), 0.16)
     textPulseOnChange: percent > 0 && settings.batteryShowPercentage
     maximumTextWidth: 54
     detailsOnClick: true
@@ -43,6 +44,13 @@ Pill {
         if (value >= 30) return "󰁽";
         if (value >= criticalThreshold) return "󰁻";
         return "󰁺";
+    }
+
+    function batteryTone() {
+        if (percent <= 0) return theme.textMuted;
+        if (percent <= criticalThreshold) return theme.error;
+        if (percent <= Math.min(100, criticalThreshold * 2)) return theme.warning;
+        return theme.primary;
     }
 
     function timeRemainingText() {

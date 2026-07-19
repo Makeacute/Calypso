@@ -99,6 +99,7 @@ Behavior and motion:
 
 - `reduceMotion`, `performanceMode`, `animationMs`
 - `motionFast`, `motionNormal`, `motionHover`, `motionPulse`, `motionBreath`, `motionOpen`, `motionClose`, `motionSpatial`, `motionEmphasis`
+- `iconMorphTransitions`
 - `osdEnabled`, `osdPosition`, `osdStyle`, `osdSize`, `osdOpacity`, `osdTimeout`
 - `osdShowIcon`, `osdShowPercent`, `osdVolume`, `osdBrightness`, `osdKeyboardBacklight`, `osdCapsLock`, `osdNumLock`, `osdMedia`, `osdBattery`
 - `tooltipDelay`, `tooltipsEnabled`, `workspaceToastTimeout`
@@ -115,7 +116,7 @@ Widget options:
 - `brightnessShowPercentage`, `brightnessStep`
 - `powerProfileShowLabel`
 - `trayCompact`, `trayMaxVisible`
-- workspace and focused-window display options
+- `workspaceShowAppIcons`, `workspaceMaxAppIcons`, and other workspace/focused-window display options
 
 Wallpaper:
 

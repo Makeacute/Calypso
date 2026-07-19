@@ -515,6 +515,7 @@ Item {
     property string hoverEffect: adapter.hoverEffect
     property string popupMotion: adapter.popupMotion
     property string workspaceIndicatorStyle: adapter.workspaceIndicatorStyle
+    property bool iconMorphTransitions: adapter.iconMorphTransitions
     property real spacingScale: adapter.spacingScale
     property real radiusScale: adapter.radiusScale
     property string barStyle: adapter.barStyle
@@ -619,6 +620,8 @@ Item {
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
     property bool workspaceShowOccupied: adapter.workspaceShowOccupied
+    property bool workspaceShowAppIcons: adapter.workspaceShowAppIcons
+    property int workspaceMaxAppIcons: adapter.workspaceMaxAppIcons
     property bool workspaceScrollEnabled: adapter.workspaceScrollEnabled
     property bool workspaceScrollWrap: adapter.workspaceScrollWrap
     property bool modulePopupPinned: adapter.modulePopupPinned
@@ -722,6 +725,7 @@ Item {
             property string animationProfile: "Physical"
             property string settingsPreset: "Balanced"
             property string workspaceIndicatorStyle: "pill"
+            property bool iconMorphTransitions: true
             property real spacingScale: 1.0
             property real radiusScale: 1.0
             property string barStyle: "islands"
@@ -799,6 +803,8 @@ Item {
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true
             property bool workspaceShowOccupied: true
+            property bool workspaceShowAppIcons: true
+            property int workspaceMaxAppIcons: 4
             property bool workspaceScrollEnabled: true
             property bool workspaceScrollWrap: true
             property bool modulePopupPinned: false

@@ -28,6 +28,8 @@ Rectangle {
     property int contentSpacing: settings.effectiveContentSpacing
     property int iconOpticalOffsetX: -Math.max(1, Math.round(settings.effectiveIconSize * 0.10))
     property color accentColor: theme.accent
+    property bool customContentColor: false
+    property color contentColor: theme && theme.text ? theme.text : Qt.rgba(1, 1, 1, 1)
     property real progress: -1
     property color progressColor: theme.alpha(accentColor, 0.16)
     property bool showGraph: false
@@ -38,11 +40,14 @@ Rectangle {
     property int textPulseDuration: Math.max(0, Math.round(settings.motionPulse * 0.55))
     property bool iconFadeOnChange: false
     property int iconFadeDuration: settings.motionNormal
+    property bool iconMorphOnChange: false
+    property int iconMorphDuration: settings.motionNormal
     property bool iconPulseActive: false
     property real iconPulseMinimumOpacity: 0.7
     property int iconPulseDuration: settings ? settings.motionBreath : 0
     property real textPulseOpacity: 1
     property real iconFadeOpacity: 1
+    property real iconMorphScale: 1
     property real iconPulseOpacity: 1
     property bool pulseAnimationsEnabled: !settings || settings.motionPulse > 0
     property string displayedIcon: icon
@@ -53,7 +58,7 @@ Rectangle {
     readonly property bool stackedDetailMode: expandedMode
                                                && detailText.length > 0
                                                && settings.moduleHeight >= Math.round(settings.effectiveFontSize * 2.2)
-    readonly property string shownText: iconOnlyMode ? "" : expandedMode && detailText.length > 0 && !stackedDetailMode ? text + " / " + detailText : text
+    readonly property string shownText: iconOnlyMode ? "" : expandedMode && detailText.length > 0 && !stackedDetailMode ? (text.length > 0 ? text + " / " + detailText : detailText) : text
     readonly property string shownDetailText: stackedDetailMode ? detailText : ""
 
     signal clicked(var mouse)
@@ -109,6 +114,19 @@ Rectangle {
         return /[0-9%./:+-]/.test(String(value || "")) ? settings.fontFamilyMono : settings.fontFamilySans;
     }
 
+    function primaryContentColor() {
+        if (customContentColor) return contentColor;
+        if (danger || urgent) return theme.urgent;
+        if (selected) return accentColor;
+        if (muted) return theme.textMuted;
+        return theme.text;
+    }
+
+    function secondaryContentColor() {
+        if (customContentColor) return theme.alpha(contentColor, muted ? 0.64 : 0.76);
+        return muted ? theme.alpha(theme.textMuted, 0.72) : theme.textMuted;
+    }
+
     implicitWidth: Math.max(minimumWidth, content.implicitWidth + (compact ? settings.effectivePillPadding : settings.effectivePillPadding * 2))
     implicitHeight: settings.moduleHeight
     width: implicitWidth
@@ -149,6 +167,12 @@ Rectangle {
     }
 
     onIconChanged: {
+        if (ready && iconMorphOnChange) {
+            pendingIcon = icon;
+            iconMorph.restart();
+            return;
+        }
+
         if (!ready || !iconFadeOnChange) {
             displayedIcon = icon;
             pendingIcon = icon;
@@ -225,10 +249,9 @@ Rectangle {
             visible: root.displayedIcon.length > 0 || root.icon.length > 0
             height: content.height
             text: root.displayedIcon
-            color: root.danger || root.urgent ? theme.urgent
-                               : root.selected ? root.accentColor
-                                             : root.muted ? theme.textMuted : theme.text
+            color: root.primaryContentColor()
             opacity: root.iconFadeOpacity * root.iconPulseOpacity
+            scale: root.iconMorphScale
             font.family: settings.fontFamilyIcon
             font.pixelSize: settings.effectiveIconSize
             verticalAlignment: Text.AlignVCenter
@@ -272,7 +295,7 @@ Rectangle {
 
                     width: parent.width
                     text: root.shownText
-                    color: root.danger || root.urgent ? theme.urgent : root.muted ? theme.textMuted : theme.text
+                    color: root.primaryContentColor()
                     font.family: root.textFontFamily(root.shownText)
                     font.pixelSize: root.shownDetailText.length > 0 ? Math.max(9, Math.round(settings.effectiveFontSize * 0.92)) : settings.effectiveFontSize
                     font.weight: root.selected ? Font.DemiBold : Font.Medium
@@ -290,7 +313,7 @@ Rectangle {
                     width: parent.width
                     visible: root.shownDetailText.length > 0 || opacity > 0
                     text: root.shownDetailText
-                    color: root.muted ? theme.alpha(theme.textMuted, 0.72) : theme.textMuted
+                    color: root.secondaryContentColor()
                     opacity: root.shownDetailText.length > 0 ? 1 : 0
                     font.family: root.textFontFamily(root.shownDetailText)
                     font.pixelSize: Math.max(8, Math.round(settings.effectiveFontSize * 0.72))
@@ -367,6 +390,50 @@ Rectangle {
             to: 1
             duration: Math.max(0, Math.round(root.textPulseDuration / 2))
             easing.type: Easing.OutCubic
+        }
+    }
+
+    SequentialAnimation {
+        id: iconMorph
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "iconFadeOpacity"
+                to: 0.42
+                duration: Math.max(0, Math.round(root.iconMorphDuration / 2))
+                easing.type: Easing.InCubic
+            }
+
+            NumberAnimation {
+                target: root
+                property: "iconMorphScale"
+                to: 0.72
+                duration: Math.max(0, Math.round(root.iconMorphDuration / 2))
+                easing.type: Easing.InCubic
+            }
+        }
+
+        ScriptAction {
+            script: root.displayedIcon = root.pendingIcon
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: root
+                property: "iconFadeOpacity"
+                to: 1
+                duration: Math.max(0, Math.round(root.iconMorphDuration / 2))
+                easing.type: Easing.OutCubic
+            }
+
+            NumberAnimation {
+                target: root
+                property: "iconMorphScale"
+                to: 1
+                duration: Math.max(0, Math.round(root.iconMorphDuration / 2))
+                easing.type: Easing.OutCubic
+            }
         }
     }
 

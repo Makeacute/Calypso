@@ -61,6 +61,55 @@ Item {
         return workspace.label || String(workspace.index);
     }
 
+    function appIcon(id) {
+        const key = String(id || "").toLowerCase();
+        if (key.includes("firefox") || key.includes("librewolf") || key.includes("zen")) return "󰈹";
+        if (key.includes("chrom") || key.includes("brave") || key.includes("vivaldi")) return "";
+        if (key.includes("code") || key.includes("codium")) return "󰨞";
+        if (key.includes("foot") || key.includes("kitty") || key.includes("alacritty") || key.includes("wezterm") || key.includes("terminal")) return "";
+        if (key.includes("thunar") || key.includes("nautilus") || key.includes("dolphin") || key.includes("files")) return "";
+        if (key.includes("obsidian")) return "󰠮";
+        if (key.includes("spotify")) return "";
+        if (key.includes("discord")) return "";
+        if (key.includes("telegram")) return "";
+        if (key.includes("steam")) return "";
+        if (key.includes("mpv") || key.includes("vlc")) return "󰎁";
+        if (key.includes("gimp") || key.includes("krita")) return "";
+        return key.length > 0 ? "󰣆" : "󰇄";
+    }
+
+    function compareWindows(left, right) {
+        const leftKey = Number(left ? left.orderKey : 0) || 0;
+        const rightKey = Number(right ? right.orderKey : 0) || 0;
+        if (leftKey !== rightKey) return leftKey - rightKey;
+        return Number(left ? left.id : 0) - Number(right ? right.id : 0);
+    }
+
+    function workspaceAppIcons(workspace) {
+        if (!settings.workspaceShowAppIcons || !workspace) return [];
+
+        const workspaceId = Number(workspace.id);
+        const maxIcons = Math.max(1, Number(settings.workspaceMaxAppIcons) || 4);
+        const list = Array.from(windows || [])
+                          .filter(window => Number(window.workspaceId) === workspaceId)
+                          .sort(compareWindows);
+        const icons = [];
+        const seen = {};
+
+        for (let i = 0; i < list.length; i++) {
+            const appId = String(list[i].appId || "");
+            const icon = appIcon(appId);
+            const key = icon + ":" + appId.toLowerCase();
+            if (seen[key]) continue;
+
+            icons.push(icon);
+            seen[key] = true;
+            if (icons.length >= maxIcons) break;
+        }
+
+        return icons;
+    }
+
     function workspaceWindowCount(workspace) {
         if (!workspace)
             return 0;
@@ -281,6 +330,9 @@ Item {
                 property bool urgent: workspaceData && workspaceData.urgent
                 property int windowCount: root.workspaceWindowCount(workspaceData)
                 property bool occupied: windowCount > 0
+                property var appIcons: root.workspaceAppIcons(workspaceData)
+                property bool showIcons: settings.workspaceShowAppIcons && appIcons.length > 0
+                property bool showLabel: root.label(workspaceData).length > 0 && settings.widgetStyle !== "iconOnly"
                 property bool pulsing: pulseAnimation.running
                 property real pulseScale: 1
                 property real pulseWash: 0
@@ -289,10 +341,14 @@ Item {
                     pulseAnimation.restart();
                 }
 
-                width: Math.max(settings.workspaceMinWidth, labelText.visible ? labelText.implicitWidth + settings.effectivePillPadding * 2 : settings.moduleHeight)
+                width: Math.max(settings.workspaceMinWidth,
+                                workspaceContent.implicitWidth > 0 ? workspaceContent.implicitWidth + settings.effectivePillPadding * 2 : settings.moduleHeight)
                 height: settings.moduleHeight
                 radius: settings.effectivePillRadius
-                color: urgent ? theme.alpha(theme.urgent, 0.18) : pulseWash > 0 ? theme.alpha(theme.accent, 0.10 * pulseWash) : hoverArea.containsMouse ? theme.surfaceHover : theme.transparent
+                color: urgent ? theme.alpha(theme.urgent, 0.18)
+                              : pulseWash > 0 ? theme.alpha(theme.primary, 0.10 * pulseWash)
+                                              : hoverArea.containsMouse ? theme.surfaceHover
+                                                                        : occupied && !focused ? theme.alpha(theme.textMuted, 0.045) : theme.transparent
                 border.color: urgent ? theme.alpha(theme.urgent, 0.44) : theme.transparent
                 border.width: urgent ? 1 : 0
                 scale: Math.max(pulseScale, hoverArea.containsMouse ? 1.012 : 1)
@@ -319,30 +375,74 @@ Item {
                     }
                 }
 
-                Text {
-                    id: labelText
+                Row {
+                    id: workspaceContent
 
                     anchors.centerIn: parent
-                    text: root.label(workspacePill.workspaceData)
-                    visible: text.length > 0
-                    color: workspacePill.urgent ? theme.urgent : workspacePill.focused ? theme.text : theme.textMuted
-                    opacity: workspacePill.urgent || workspacePill.focused ? 1 : 0.55
-                    font.family: settings.fontFamilyMono
-                    font.pixelSize: settings.effectiveFontSize
-                    font.weight: workspacePill.focused ? Font.Bold : Font.Medium
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                    height: parent.height
+                    spacing: workspacePill.showLabel && workspacePill.showIcons ? Math.max(1, Math.round(settings.effectiveContentSpacing * 0.7)) : 0
 
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: settings.motionNormal
+                    Text {
+                        id: labelText
+
+                        visible: workspacePill.showLabel
+                        height: parent.height
+                        text: root.label(workspacePill.workspaceData)
+                        color: workspacePill.urgent ? theme.error : workspacePill.focused ? theme.text : theme.textMuted
+                        opacity: workspacePill.urgent || workspacePill.focused ? 1 : 0.66
+                        font.family: settings.fontFamilyMono
+                        font.pixelSize: settings.effectiveFontSize
+                        font.weight: workspacePill.focused ? Font.Bold : Font.Medium
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: settings.motionNormal
+                            }
+                        }
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: settings.motionNormal
+                                easing.type: Easing.OutCubic
+                            }
                         }
                     }
 
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: settings.motionNormal
-                            easing.type: Easing.OutCubic
+                    Row {
+                        id: workspaceIconRow
+
+                        visible: workspacePill.showIcons
+                        height: parent.height
+                        spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.45))
+
+                        Repeater {
+                            model: workspacePill.appIcons
+
+                            Text {
+                                required property var modelData
+
+                                width: Math.max(8, Math.round(settings.effectiveIconSize * 0.82))
+                                height: workspaceIconRow.height
+                                text: String(modelData)
+                                color: workspacePill.urgent ? theme.error
+                                                            : workspacePill.focused ? theme.text
+                                                                                     : workspacePill.active ? theme.primary : theme.textMuted
+                                opacity: workspacePill.focused || workspacePill.active ? 0.96 : 0.72
+                                font.family: settings.fontFamilyIcon
+                                font.pixelSize: Math.max(8, Math.round(settings.effectiveIconSize * 0.72))
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+
+                                Behavior on color {
+                                    ColorAnimation { duration: settings.motionNormal }
+                                }
+
+                                Behavior on opacity {
+                                    NumberAnimation { duration: settings.motionNormal; easing.type: Easing.OutCubic }
+                                }
+                            }
                         }
                     }
                 }

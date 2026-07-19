@@ -16,7 +16,7 @@ Pill {
     muted: isMuted || !hasAudio
     progress: hasAudio ? Math.max(0, Math.min(1, volume)) : -1
     progressColor: isMuted ? theme.alpha(theme.textMuted, 0.10) : theme.alpha(theme.accent, 0.16)
-    iconFadeOnChange: true
+    iconMorphOnChange: settings.iconMorphTransitions
     textPulseOnChange: hasAudio && text.length > 0
     maximumTextWidth: settings.audioShowDeviceName ? 140 : 54
     detailsOnClick: true

@@ -284,3 +284,48 @@ Date: 2026-07-19
 - Restarted Quickshell after the QML reload fix. Fresh instance `jvs1pw6fit` loaded successfully.
 - Closed-popup 60 second idle sample on PID `76614`: `4.690s` CPU time, `7.817%` of one core.
 - Fresh log after restart had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 2B Bar Module Redesign
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `Settings.qml`
+- `settings.example.json`
+- `README.md`
+- `widgets/Pill.qml`
+- `widgets/Workspace.qml`
+- `widgets/Network.qml`
+- `widgets/Battery.qml`
+- `widgets/Audio.qml`
+- `widgets/Media.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added per-workspace app icons inside workspace pills using the existing normalized Niri window list.
+- Added settings defaults for `workspaceShowAppIcons`, `workspaceMaxAppIcons`, and `iconMorphTransitions`.
+- Updated the network pill to show separate down/up rates when `networkShowSpeed` is enabled.
+- Added opt-in icon morph transitions to `Pill.qml` and enabled them for media play/pause, network online/offline, and audio mute/unmute.
+- Added a custom content color hook to `Pill.qml` and used it so battery icon/text color shifts through primary, warning, and error tones based on the configured critical threshold.
+- Removed the always-visible charging icon pulse from battery to avoid idle breathing animation.
+- Fixed expanded graph pills with empty primary text so they no longer render a leading slash.
+
+### Decisions Made
+
+- Reused the existing CPU and memory bar graph path because `Cpu.qml` and `Memory.qml` already feed `showGraph`/`graphValues` into `Pill`.
+- Reused the existing tray context-menu path: `TrayButton` already calls `itemData.display(...)` on right-click when `hasMenu` is exposed.
+- Did not add desktop-file icon lookup for workspace icons in this phase; the workspace pill uses the same lightweight app-id glyph mapping style already used by `FocusedWindow.qml`.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured bar screenshots for all widget styles with graph/speed paths temporarily enabled, then restored the original config: `/tmp/calypso-phase2b-20260719/bar-iconOnly.png`, `bar-iconAndText.png`, and `bar-expanded-recheck.png`.
+- Verified network down/up speed text and CPU/memory graph pills rendered in the bar screenshots.
+- Temporarily raised `batteryCriticalThreshold` and captured warning/error color checks: `/tmp/calypso-phase2b-20260719/battery-warning-tone.png` and `battery-error-tone.png`; original config was restored.
+- `ffmpeg` could not capture the Wayland session directly (`kmsgrab` failed with no DRM device, and this build has no Wayland/PipeWire input). Used `wf-recorder` for screen capture and `ffmpeg` for frame extraction.
+- Motion clips captured: audio mute/unmute via `wpctl` at `/tmp/calypso-phase2b-20260719/audio-morph-wpctl.mp4`; network online/offline via controlled interface setting change at `network-morph.mp4`; media play/pause via ydotool media key at `media-morph-key-long.mp4`; reduce-motion media check at `media-morph-reduce-motion.mp4`.
+- ydotool media key was verified to change `playerctl` state `Playing -> Paused -> Playing`. ydotool mute key did not change PipeWire mute state on this session, so audio morph used `wpctl`; no safe ydotool trigger was available for Wi-Fi online/offline without toggling radios.
+- 60 second idle sample on PID `84079`: `0.890s` CPU time, `1.483%` of one core.
+- Current log window had no Calypso/QML warnings.

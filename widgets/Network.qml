@@ -14,11 +14,11 @@ Pill {
 
     icon: online ? networkIcon(device) : "󰤮"
     text: networkText()
-    detailText: settings.widgetStyle === "expanded" && online ? speedText() : ""
+    detailText: settings.widgetStyle === "expanded" && online ? (settings.networkShowSpeed ? shortDevice(device) : speedText()) : ""
     muted: !online
-    iconFadeOnChange: true
+    iconMorphOnChange: settings.iconMorphTransitions
     textPulseOnChange: true
-    maximumTextWidth: settings.networkShowSpeed ? 88 : 72
+    maximumTextWidth: settings.networkShowSpeed ? 132 : 72
     detailsOnClick: true
     detailsModuleName: "network"
 
@@ -42,11 +42,15 @@ Pill {
         return String(settings.networkInterfaceName || "").trim();
     }
 
+    function rateText(value) {
+        const amount = Math.max(0, Number(value) || 0);
+        if (amount < 1024) return Math.round(amount) + "B/s";
+        if (amount < 1024 * 1024) return Math.round(amount / 1024) + "K/s";
+        return (Math.round(amount / 1024 / 1024 * 10) / 10) + "M/s";
+    }
+
     function speedText() {
-        const total = Math.max(0, rxRate + txRate);
-        if (total < 1024) return Math.round(total) + "B/s";
-        if (total < 1024 * 1024) return Math.round(total / 1024) + "K/s";
-        return (Math.round(total / 1024 / 1024 * 10) / 10) + "M/s";
+        return "↓" + rateText(rxRate) + " ↑" + rateText(txRate);
     }
 
     function networkText() {

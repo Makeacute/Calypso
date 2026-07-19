@@ -119,7 +119,7 @@ Item {
             active: root.playing
             muted: !root.playing
             clickable: root.canToggle
-            iconFadeOnChange: true
+            iconMorphOnChange: settings.iconMorphTransitions
             textPulseOnChange: true
             maximumTextWidth: settings.mediaMaxWidth
             onClicked: root.runAction("play-pause")
@@ -148,7 +148,7 @@ Item {
             enabled: root.canToggle
             muted: !root.canToggle
             clickable: root.canToggle
-            iconFadeOnChange: true
+            iconMorphOnChange: settings.iconMorphTransitions
             minimumWidth: root.settings.moduleHeight
             onClicked: root.runAction("play-pause")
         }
