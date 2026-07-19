@@ -250,3 +250,37 @@ Date: 2026-07-19
 - Recorded OSD motion clip at `/tmp/calypso-phase15-osd-motion.mp4`; visual review showed the existing reveal/fill motion without snap.
 - 60 second idle sample on PID `76614`: `7.700s` CPU time, `12.833%` of one core. A follow-up `top` check showed Quickshell around `4.7%` then `7.8%`; logs stayed clean.
 - Fresh logs had no Calypso/QML warnings; only the known external Qt portal registration warning remained.
+
+## Phase 2A Module Popup Gauges
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `ModuleDetailsPanel.qml`
+- `Settings.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Replaced the CPU, memory, network, and battery popup hero bars with circular Canvas gauges.
+- Added compact sparkline history for the same four popup hero metrics using the existing popup refresh cadence instead of a new poller.
+- Added configurable popup gauge keys: `modulePopupShowGauge`, `modulePopupShowSparkline`, `modulePopupHistorySamples`, and `modulePopupNetworkScaleKib`.
+- Mapped target module gauge severity to `theme.primary`, `theme.warning`, and `theme.error`.
+
+### Decisions Made
+
+- Kept the existing Overview / Controls / Diagnostics tab structure unchanged.
+- Used the existing module details timer for history samples so Phase 2A adds no new background polling.
+- Network gauge progress is normalized against `modulePopupNetworkScaleKib`; value text shows combined RX/TX throughput.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured target popup screenshots in `/tmp/calypso-phase2a-20260719/`: `cpu.png`, `memory.png`, `network.png`, and `battery.png`.
+- Simulated high CPU load with two short-lived `yes` processes and captured `/tmp/calypso-phase2a-20260719/cpu-high-load.png`; the CPU gauge reached `100%` and shifted to the error tone.
+- Restarted Quickshell after the QML reload fix. Fresh instance `jvs1pw6fit` loaded successfully.
+- Closed-popup 60 second idle sample on PID `76614`: `4.690s` CPU time, `7.817%` of one core.
+- Fresh log after restart had no Calypso/QML warnings; only the known external Qt portal registration warning remained.

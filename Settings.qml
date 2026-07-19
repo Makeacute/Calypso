@@ -623,6 +623,10 @@ Item {
     property bool workspaceScrollWrap: adapter.workspaceScrollWrap
     property bool modulePopupPinned: adapter.modulePopupPinned
     property string modulePopupDefaultTab: adapter.modulePopupDefaultTab
+    property bool modulePopupShowGauge: adapter.modulePopupShowGauge
+    property bool modulePopupShowSparkline: adapter.modulePopupShowSparkline
+    property int modulePopupHistorySamples: adapter.modulePopupHistorySamples
+    property int modulePopupNetworkScaleKib: adapter.modulePopupNetworkScaleKib
     property string palettePath: adapter.palettePath
     property string paletteSource: adapter.paletteSource
     property string manualAccent: adapter.manualAccent
@@ -799,6 +803,10 @@ Item {
             property bool workspaceScrollWrap: true
             property bool modulePopupPinned: false
             property string modulePopupDefaultTab: "Overview"
+            property bool modulePopupShowGauge: true
+            property bool modulePopupShowSparkline: true
+            property int modulePopupHistorySamples: 24
+            property int modulePopupNetworkScaleKib: 10240
             property string palettePath: "/home/lucian/.config/quickshell/palette.json"
             property string paletteSource: "wallpaper"
             property string manualAccent: "#90a4c8"

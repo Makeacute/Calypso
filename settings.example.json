@@ -82,7 +82,11 @@
   "mediaShowControls": true,
   "memoryShowGraph": false,
   "modulePopupDefaultTab": "Overview",
+  "modulePopupHistorySamples": 24,
+  "modulePopupNetworkScaleKib": 10240,
   "modulePopupPinned": false,
+  "modulePopupShowGauge": true,
+  "modulePopupShowSparkline": true,
   "moduleRegistry": [
     {
       "aliases": [],

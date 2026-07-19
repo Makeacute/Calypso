@@ -22,6 +22,15 @@ PopupWindow {
     property var topRows: []
     property var listRows: []
     property var ipRows: []
+    property var cpuHistory: []
+    property var memoryHistory: []
+    property var networkHistory: []
+    property var batteryHistory: []
+    property real previousNetworkRx: 0
+    property real previousNetworkTx: 0
+    property real previousNetworkStamp: 0
+    property real networkRxRate: 0
+    property real networkTxRate: 0
     property bool pendingRefresh: false
     readonly property bool hasAudio: sink && sink.audio
 
@@ -66,6 +75,75 @@ PopupWindow {
     function boolValue(key) {
         const value = String(detailData[key] || "").toLowerCase();
         return value === "1" || value === "yes" || value === "true" || value === "on";
+    }
+
+    function historyLimit() {
+        return Math.max(4, Number(settings ? settings.modulePopupHistorySamples : 0) || 24);
+    }
+
+    function rememberHistory(current, value) {
+        const next = Array.from(current || []);
+        next.push(Math.max(0, Math.min(1, Number(value) || 0)));
+
+        while (next.length > historyLimit()) next.shift();
+        return next;
+    }
+
+    function moduleHistory(name) {
+        if (name === "cpu") return cpuHistory;
+        if (name === "memory") return memoryHistory;
+        if (name === "network") return networkHistory;
+        if (name === "battery") return batteryHistory;
+        return [];
+    }
+
+    function networkScaleBytes() {
+        return Math.max(1024, (Number(settings ? settings.modulePopupNetworkScaleKib : 0) || 10240) * 1024);
+    }
+
+    function networkTotalRate() {
+        return Math.max(0, networkRxRate + networkTxRate);
+    }
+
+    function networkProgress() {
+        return Math.max(0, Math.min(1, networkTotalRate() / networkScaleBytes()));
+    }
+
+    function networkRateText() {
+        if (!boolValue("online")) return "offline";
+        const total = networkTotalRate();
+        if (total <= 0) return root.textValue("device", "online");
+        return formatBytes(total) + "/s";
+    }
+
+    function rememberDetailSample(data) {
+        const name = String((data && data.module) || moduleName);
+
+        if (name === "cpu") {
+            cpuHistory = rememberHistory(cpuHistory, (Number(data.usage) || 0) / 100);
+        } else if (name === "memory") {
+            memoryHistory = rememberHistory(memoryHistory, (Number(data.mem_percent) || 0) / 100);
+        } else if (name === "battery") {
+            batteryHistory = rememberHistory(batteryHistory, (Number(data.capacity) || 0) / 100);
+        } else if (name === "network") {
+            const rx = Number(data.rx) || 0;
+            const tx = Number(data.tx) || 0;
+            const now = Date.now();
+
+            if (previousNetworkStamp > 0 && now > previousNetworkStamp && rx >= previousNetworkRx && tx >= previousNetworkTx) {
+                const seconds = Math.max(0.001, (now - previousNetworkStamp) / 1000);
+                networkRxRate = (rx - previousNetworkRx) / seconds;
+                networkTxRate = (tx - previousNetworkTx) / seconds;
+            } else if (String(data.online || "").toLowerCase() !== "1" && String(data.online || "").toLowerCase() !== "true") {
+                networkRxRate = 0;
+                networkTxRate = 0;
+            }
+
+            previousNetworkRx = rx;
+            previousNetworkTx = tx;
+            previousNetworkStamp = now;
+            networkHistory = rememberHistory(networkHistory, networkProgress());
+        }
     }
 
     function formatBytes(value) {
@@ -124,6 +202,7 @@ PopupWindow {
         topRows = top;
         listRows = rows;
         ipRows = ips;
+        rememberDetailSample(data);
     }
 
     function clampedX(value) {
@@ -487,7 +566,8 @@ PopupWindow {
             valueText: Math.round(root.numberValue("usage", 0)) + "%"
             subText: root.textValue("cores", "0") + " cores / load " + root.textValue("load", "0 0 0")
             progress: root.numberValue("usage", 0) / 100
-            accentColor: root.numberValue("usage", 0) >= 90 ? theme.urgent : root.numberValue("usage", 0) >= 70 ? theme.warning : theme.accent
+            accentColor: root.numberValue("usage", 0) >= 90 ? theme.error : root.numberValue("usage", 0) >= 70 ? theme.warning : theme.primary
+            sampleHistory: root.cpuHistory
         }
 
         Flow {
@@ -540,12 +620,13 @@ PopupWindow {
             width: parent.width
             theme: root.theme
             settings: root.settings
-            title: root.boolValue("online") ? "Connected" : "Offline"
+            title: root.boolValue("online") ? "Network activity" : "Offline"
             icon: root.textValue("kind", "other") === "wifi" ? "󰤨" : "󰈀"
-            valueText: root.textValue("device", "none")
-            subText: root.textValue("ssid", root.textValue("state", "offline"))
-            progress: root.boolValue("online") ? 1 : 0
-            accentColor: root.boolValue("online") ? theme.good : theme.textMuted
+            valueText: root.networkRateText()
+            subText: root.boolValue("online") ? root.textValue("device", "net") + " / down " + root.formatBytes(root.networkRxRate) + "/s up " + root.formatBytes(root.networkTxRate) + "/s" : root.textValue("state", "offline")
+            progress: root.boolValue("online") ? root.networkProgress() : 0
+            accentColor: !root.boolValue("online") ? theme.textMuted : root.networkProgress() >= 0.90 ? theme.error : root.networkProgress() >= 0.72 ? theme.warning : theme.primary
+            sampleHistory: root.networkHistory
         }
 
         Flow {
@@ -608,7 +689,8 @@ PopupWindow {
             valueText: Math.round(root.numberValue("mem_percent", 0)) + "%"
             subText: root.formatKib(root.numberValue("mem_used", 0)) + " used of " + root.formatKib(root.numberValue("mem_total", 0))
             progress: root.numberValue("mem_percent", 0) / 100
-            accentColor: root.numberValue("mem_percent", 0) >= 90 ? theme.urgent : root.numberValue("mem_percent", 0) >= 75 ? theme.warning : theme.accent
+            accentColor: root.numberValue("mem_percent", 0) >= 90 ? theme.error : root.numberValue("mem_percent", 0) >= 75 ? theme.warning : theme.primary
+            sampleHistory: root.memoryHistory
         }
 
         Flow {
@@ -636,7 +718,8 @@ PopupWindow {
             valueText: root.boolValue("present") ? Math.round(root.numberValue("capacity", 0)) + "%" : "none"
             subText: root.textValue("manufacturer", "") + " " + root.textValue("model_name", "")
             progress: root.numberValue("capacity", 0) / 100
-            accentColor: root.numberValue("capacity", 0) <= settings.batteryCriticalThreshold ? theme.urgent : theme.good
+            accentColor: root.numberValue("capacity", 0) <= settings.batteryCriticalThreshold ? theme.error : root.numberValue("capacity", 0) <= settings.batteryCriticalThreshold * 2 ? theme.warning : theme.primary
+            sampleHistory: root.batteryHistory
         }
 
         Flow {
@@ -894,8 +977,12 @@ PopupWindow {
         property string subText: ""
         property real progress: 0
         property color accentColor: theme.accent
+        property var sampleHistory: []
+        readonly property bool useGauge: settings.modulePopupShowGauge
+        readonly property bool useSparkline: settings.modulePopupShowSparkline && sampleHistory.length > 1
+        readonly property int gaugeSize: Math.round(settings.controlHeight * (useGauge ? 3.15 : 1.45))
 
-        implicitHeight: Math.max(settings.controlHeight * 2.45, gaugeContent.implicitHeight + settings.effectivePillPadding * 2)
+        implicitHeight: Math.max(settings.controlHeight * 2.7, gaugeContent.implicitHeight + settings.effectivePillPadding * 2)
 
         Row {
             id: gaugeContent
@@ -905,27 +992,46 @@ PopupWindow {
             width: parent.width - settings.effectivePillPadding * 2
             spacing: settings.effectivePillPadding
 
-            Rectangle {
-                width: Math.round(settings.controlHeight * 1.45)
-                height: width
-                radius: width / 2
-                color: theme.alpha(gauge.accentColor, 0.16)
-                border.color: theme.alpha(gauge.accentColor, 0.28)
-                border.width: settings.effectiveBorderWidth
-                antialiasing: true
+            Item {
+                id: gaugeVisual
 
-                Text {
-                    anchors.centerIn: parent
-                    text: gauge.icon
-                    color: gauge.accentColor
-                    font.family: settings.fontFamilyIcon
-                    font.pixelSize: settings.effectiveIconSize
+                width: gauge.gaugeSize
+                height: gauge.gaugeSize
+
+                CircularGauge {
+                    anchors.fill: parent
+                    visible: gauge.useGauge
+                    theme: gauge.theme
+                    settings: gauge.settings
+                    value: gauge.progress
+                    accentColor: gauge.accentColor
+                    icon: gauge.icon
+                    valueText: gauge.valueText
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    visible: !gauge.useGauge
+                    radius: width / 2
+                    color: theme.alpha(gauge.accentColor, 0.16)
+                    border.color: theme.alpha(gauge.accentColor, 0.28)
+                    border.width: settings.effectiveBorderWidth
+                    antialiasing: true
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: gauge.icon
+                        color: gauge.accentColor
+                        font.family: settings.fontFamilyIcon
+                        font.pixelSize: settings.effectiveIconSize
+                    }
                 }
             }
 
             Column {
-                width: parent.width - parent.spacing - settings.controlHeight * 1.45
+                width: Math.max(0, parent.width - parent.spacing - gaugeVisual.width)
                 spacing: Math.max(2, settings.effectiveContentSpacing / 2)
+                anchors.verticalCenter: parent.verticalCenter
 
                 Text {
                     width: parent.width
@@ -939,6 +1045,7 @@ PopupWindow {
 
                 Text {
                     width: parent.width
+                    visible: !gauge.useGauge
                     text: gauge.valueText
                     color: gauge.accentColor
                     elide: Text.ElideRight
@@ -948,10 +1055,21 @@ PopupWindow {
                 }
 
                 ProgressLine {
+                    visible: !gauge.useGauge
                     width: parent.width
                     theme: root.theme
                     settings: root.settings
                     value: gauge.progress
+                    accentColor: gauge.accentColor
+                }
+
+                Sparkline {
+                    width: parent.width
+                    height: settings.controlHeight
+                    visible: gauge.useSparkline
+                    theme: gauge.theme
+                    settings: gauge.settings
+                    values: gauge.sampleHistory
                     accentColor: gauge.accentColor
                 }
 
@@ -965,6 +1083,136 @@ PopupWindow {
                 }
             }
         }
+    }
+
+    component CircularGauge: Item {
+        id: gaugeRoot
+
+        property var theme
+        property var settings
+        property real value: 0
+        property color accentColor: theme && theme.primary ? theme.primary : Qt.rgba(1, 1, 1, 1)
+        property string icon: ""
+        property string valueText: ""
+        readonly property real clampedValue: Math.max(0, Math.min(1, Number(value) || 0))
+
+        Canvas {
+            id: gaugeCanvas
+
+            anchors.fill: parent
+            antialiasing: true
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+
+                if (!gaugeRoot.theme || !gaugeRoot.settings || width <= 0 || height <= 0) return;
+
+                const lineWidth = Math.max(gaugeRoot.settings.effectiveGroupPadding, Math.round(Math.min(width, height) * 0.075));
+                const inset = lineWidth / 2 + gaugeRoot.settings.effectiveBorderWidth;
+                const radius = Math.max(0, Math.min(width, height) / 2 - inset);
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const start = -Math.PI * 0.72;
+                const span = Math.PI * 1.44;
+
+                ctx.lineWidth = lineWidth;
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, start, start + span, false);
+                ctx.strokeStyle = gaugeRoot.theme.alpha(gaugeRoot.theme.outlineVariant, 0.70);
+                ctx.stroke();
+
+                if (gaugeRoot.clampedValue > 0.001) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, start, start + span * gaugeRoot.clampedValue, false);
+                    ctx.strokeStyle = gaugeRoot.accentColor;
+                    ctx.stroke();
+                }
+            }
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            Connections {
+                target: gaugeRoot
+                function onClampedValueChanged() { gaugeCanvas.requestPaint(); }
+                function onAccentColorChanged() { gaugeCanvas.requestPaint(); }
+            }
+        }
+
+        Column {
+            anchors.centerIn: parent
+            width: Math.round(parent.width * 0.76)
+            spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.25))
+
+            Text {
+                width: parent.width
+                text: gaugeRoot.icon
+                color: gaugeRoot.accentColor
+                horizontalAlignment: Text.AlignHCenter
+                font.family: settings.fontFamilyIcon
+                font.pixelSize: Math.max(9, Math.round(settings.effectiveIconSize * 0.82))
+            }
+
+            Text {
+                width: parent.width
+                text: gaugeRoot.valueText
+                color: theme.text
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                font.family: settings.fontFamilyMono
+                font.pixelSize: gaugeRoot.valueText.length > 5 ? Math.round(settings.effectiveFontSize * 1.08) : Math.round(settings.effectiveFontSize * 1.42)
+                font.weight: Font.Bold
+            }
+        }
+    }
+
+    component Sparkline: Canvas {
+        id: sparklineRoot
+
+        property var theme
+        property var settings
+        property var values: []
+        property color accentColor: theme && theme.primary ? theme.primary : Qt.rgba(1, 1, 1, 1)
+
+        antialiasing: true
+        opacity: values.length > 1 ? 1 : 0
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const samples = Array.from(values || []);
+            if (!theme || !settings || width <= 0 || height <= 0 || samples.length <= 0) return;
+
+            const padding = Math.max(1, settings.effectiveBorderWidth);
+            const usableWidth = Math.max(1, width - padding * 2);
+            const usableHeight = Math.max(1, height - padding * 2);
+            const baseY = height - padding;
+
+            ctx.lineWidth = Math.max(1, settings.effectiveBorderWidth);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(padding, baseY);
+            ctx.lineTo(width - padding, baseY);
+            ctx.strokeStyle = theme.alpha(theme.outlineVariant, 0.55);
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = 0; i < samples.length; i++) {
+                const ratio = samples.length <= 1 ? 0 : i / (samples.length - 1);
+                const x = padding + ratio * usableWidth;
+                const y = padding + (1 - Math.max(0, Math.min(1, Number(samples[i]) || 0))) * usableHeight;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = sparklineRoot.accentColor;
+            ctx.stroke();
+        }
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onValuesChanged: requestPaint()
+        onAccentColorChanged: requestPaint()
     }
 
     component MetricCard: PanelCard {

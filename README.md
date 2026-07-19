@@ -109,6 +109,7 @@ Widget options:
 - `audioShowPercentage`, `audioShowDeviceName`
 - `networkShowSpeed`, `networkInterfaceName`
 - `batteryShowPercentage`, `batteryCriticalThreshold`
+- `modulePopupShowGauge`, `modulePopupShowSparkline`, `modulePopupHistorySamples`, `modulePopupNetworkScaleKib`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`
