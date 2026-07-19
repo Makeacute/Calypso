@@ -463,3 +463,49 @@ Date: 2026-07-19
 - Clipboard open idle sample on PID `4786`: `1.080s` CPU time over `60.023s`, `1.799%` of one core.
 - Processes open idle sample on PID `4786`: `1.510s` CPU time over `60.041s`, `2.515%` of one core.
 - Final log window had no Calypso/QML warnings or errors.
+
+## Phase 4.5 Workspace App System Icons
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `services/NiriService.qml`
+- `widgets/AppIconImage.qml`
+- `widgets/AppIconResolver.qml`
+- `widgets/FocusedWindow.qml`
+- `widgets/Workspace.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Replaced the focused-window/workspace-app module's Nerd Font glyph icons with Quickshell `IconImage` system-theme icons.
+- Replaced the per-workspace app glyph path in `Workspace.qml` with the same centered system-icon renderer.
+- Added shared `AppIconResolver` and `AppIconImage` components with exact desktop-entry lookup, conservative app-id icon mapping, `Quickshell.hasThemeIcon()` guards, and token-styled initial fallbacks.
+- Removed the clipped empty focused-window pill and app-entry fade that caused a generic/blank ghost icon to appear during app launch in `barStyle: islands`.
+- Cached desktop entries, icon names, icon paths, and display names per app ID so icon-theme lookup does not repeat on every compositor window update.
+- Removed the old Niri known-window `WindowOpenedOrChanged` pre-sync path so title-only events are filtered in-process instead of repeatedly spawning `niri msg windows`.
+
+### Decisions Made
+
+- Kept this as a standalone Phase 4.5 change, separate from the staged Phase 4 popover work.
+- Removed fuzzy `DesktopEntries.heuristicLookup()` from the app-id path because short IDs such as `code` can resolve to unrelated theme/action icons.
+- Kept focus/active styling on the pill surface instead of tinting app icons, preserving real app icon colors.
+- Kept the focused-window module hidden on workspaces with no windows; no empty placeholder pill is reserved.
+
+### Verification
+
+- Verified the current Quickshell instance `yo3gudfit` hot-reloaded the Phase 4.5 files without QML errors.
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured current terminal system-icon state at `/tmp/calypso-phase45-system-icons-current-full.png` and `/tmp/calypso-phase45-system-icons-current-crop.png`.
+- Spawned temporary `librewolf`, `code`, and `footclient` app-id windows; captured `/tmp/calypso-phase45-system-icons-test-full-6.png` and `/tmp/calypso-phase45-system-icons-test-crop-6.png`.
+- Confirmed terminal/LibreWolf render as centered system images. The fake `code` app ID has no installed/resolvable system icon in this session, so it renders the neutral `C` fallback instead of a Nerd Font glyph or Qt missing-image tile.
+- Captured the corrected terminal icon placement at `/tmp/calypso-phase45-system-icons-centered-after-yfix.png`.
+- Closed temporary test windows `67`, `68`, and `69`.
+- Reproduced the empty-workspace app-spawn transition before the final fix at `/tmp/calypso-empty-spawn-contact-before-fix.png`.
+- Captured the final app-spawn transition after removing the ghost empty pill and Niri pre-sync path at `/tmp/calypso-empty-spawn-contact-after-niri-fix.png`; the first visible app frame is the terminal system icon.
+- Captured current focused-window zoom at `/tmp/calypso-phase45-current-center-cached-4x.png`.
+- Temporarily enabled `workspaceShowAppIcons` and captured `/tmp/calypso-phase45-workspace-pill-system-icons-enabled.png` plus zoom `/tmp/calypso-phase45-workspace-pill-system-icons-enabled-zoom.png`; per-workspace app icons render as centered system images.
+- Temporarily tested `barStyle` `islands`/`solid`/`pill` and `barPosition` `top`/`bottom`, restored `settings.json`, and captured `/tmp/calypso-phase45-layout-matrix.png`; full-width bottom checks include `/tmp/calypso-phase45-islands-bottom-fullwidth-slow.png` and `/tmp/calypso-phase45-pill-bottom-fullscreen-slow.png`.
+- Idle CPU samples on PID `4786`: noisy pre-cache/pre-event-fix samples were `5.187%`, `2.068%`, and `3.508%` of one core; final post-cache/post-event-fix sample was `0.920s` CPU over `60.443s`, `1.522%` of one core, with the ending `top` line at `0.0%`.
+- Final log window had no Calypso/QML warnings or errors.

@@ -28,6 +28,10 @@ Item {
     implicitWidth: workspaceRow.implicitWidth
     implicitHeight: settings.moduleHeight
 
+    AppIconResolver {
+        id: appIconResolver
+    }
+
     function focusedOutput(list) {
         for (let i = 0; i < list.length; i++) {
             if (list[i].focused)
@@ -61,23 +65,6 @@ Item {
         return workspace.label || String(workspace.index);
     }
 
-    function appIcon(id) {
-        const key = String(id || "").toLowerCase();
-        if (key.includes("firefox") || key.includes("librewolf") || key.includes("zen")) return "󰈹";
-        if (key.includes("chrom") || key.includes("brave") || key.includes("vivaldi")) return "";
-        if (key.includes("code") || key.includes("codium")) return "󰨞";
-        if (key.includes("foot") || key.includes("kitty") || key.includes("alacritty") || key.includes("wezterm") || key.includes("terminal")) return "";
-        if (key.includes("thunar") || key.includes("nautilus") || key.includes("dolphin") || key.includes("files")) return "";
-        if (key.includes("obsidian")) return "󰠮";
-        if (key.includes("spotify")) return "";
-        if (key.includes("discord")) return "";
-        if (key.includes("telegram")) return "";
-        if (key.includes("steam")) return "";
-        if (key.includes("mpv") || key.includes("vlc")) return "󰎁";
-        if (key.includes("gimp") || key.includes("krita")) return "";
-        return key.length > 0 ? "󰣆" : "󰇄";
-    }
-
     function compareWindows(left, right) {
         const leftKey = Number(left ? left.orderKey : 0) || 0;
         const rightKey = Number(right ? right.orderKey : 0) || 0;
@@ -98,11 +85,10 @@ Item {
 
         for (let i = 0; i < list.length; i++) {
             const appId = String(list[i].appId || "");
-            const icon = appIcon(appId);
-            const key = icon + ":" + appId.toLowerCase();
+            const key = appId.toLowerCase();
             if (seen[key]) continue;
 
-            icons.push(icon);
+            icons.push(appId);
             seen[key] = true;
             if (icons.length >= maxIcons) break;
         }
@@ -420,27 +406,27 @@ Item {
                         Repeater {
                             model: workspacePill.appIcons
 
-                            Text {
+                            Item {
+                                id: workspaceAppIconSlot
+
                                 required property var modelData
 
-                                width: Math.max(8, Math.round(settings.effectiveIconSize * 0.82))
+                                width: settings.effectiveIconSize
                                 height: workspaceIconRow.height
-                                text: String(modelData)
-                                color: workspacePill.urgent ? theme.error
-                                                            : workspacePill.focused ? theme.text
-                                                                                     : workspacePill.active ? theme.primary : theme.textMuted
                                 opacity: workspacePill.focused || workspacePill.active ? 0.96 : 0.72
-                                font.family: settings.fontFamilyIcon
-                                font.pixelSize: Math.max(8, Math.round(settings.effectiveIconSize * 0.72))
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-
-                                Behavior on color {
-                                    ColorAnimation { duration: settings.motionNormal }
-                                }
 
                                 Behavior on opacity {
                                     NumberAnimation { duration: settings.motionNormal; easing.type: Easing.OutCubic }
+                                }
+
+                                AppIconImage {
+                                    anchors.centerIn: parent
+                                    width: settings.effectiveIconSize
+                                    height: settings.effectiveIconSize
+                                    theme: root.theme
+                                    settings: root.settings
+                                    iconSource: appIconResolver.source(String(workspaceAppIconSlot.modelData || ""))
+                                    fallbackText: appIconResolver.initial(String(workspaceAppIconSlot.modelData || ""))
                                 }
                             }
                         }

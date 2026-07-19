@@ -13,7 +13,6 @@ Item {
     property var focusedWindow: ({})
     property var settings
     property var seenWindowIds: ({})
-    property bool windowSyncPending: false
     property int openedWindowWorkspaceId: -1
     property int openedWindowSerial: 0
 
@@ -78,31 +77,6 @@ Item {
             && current.is_urgent === incoming.is_urgent
             && sameLayout(current.layout, incoming.layout)
             && String(current.title || "") !== String(incoming.title || "");
-    }
-
-    function knownWindowIdFromLine(line) {
-        const text = String(line || "");
-        const marker = "\"window\":{\"id\":";
-        const start = text.indexOf(marker);
-        if (start < 0) return -1;
-
-        let offset = start + marker.length;
-        let raw = "";
-        while (offset < text.length) {
-            const ch = text.charAt(offset);
-            if (ch < "0" || ch > "9") break;
-            raw += ch;
-            offset += 1;
-        }
-
-        const id = Number(raw);
-        return Number.isFinite(id) ? id : -1;
-    }
-
-    function scheduleWindowSync() {
-        if (windowSyncPending) return;
-        windowSyncPending = true;
-        windowSyncTimer.start();
     }
 
     function applyWorkspaceActivated(id, focused) {
@@ -221,14 +195,6 @@ Item {
         const trimmed = String(line || "").trim();
         if (trimmed.length === 0) return;
 
-        if (!trackWindowTitles() && trimmed.indexOf("\"WindowOpenedOrChanged\"") >= 0) {
-            const windowId = knownWindowIdFromLine(trimmed);
-            if (windowId >= 0 && (seenWindowIds || {})[String(windowId)]) {
-                scheduleWindowSync();
-                return;
-            }
-        }
-
         try {
             const event = JSON.parse(trimmed);
 
@@ -315,17 +281,5 @@ Item {
             eventStream.running = true;
         }
     }
-
-    Timer {
-        id: windowSyncTimer
-
-        interval: 1500
-        repeat: false
-        onTriggered: {
-            root.windowSyncPending = false;
-            if (!windowsProc.running) windowsProc.running = true;
-        }
-    }
-
     Component.onCompleted: root.sync()
 }

@@ -13,8 +13,12 @@ Item {
 
     width: implicitWidth
     height: implicitHeight
-    implicitWidth: workspaceWindows.length > 0 ? appRow.implicitWidth : emptyPill.implicitWidth
+    implicitWidth: workspaceWindows.length > 0 ? Math.max(settings.moduleHeight, appRow.implicitWidth) : 0
     implicitHeight: settings.moduleHeight
+
+    AppIconResolver {
+        id: appIconResolver
+    }
 
     function focusedWorkspace() {
         for (let i = 0; i < workspaces.length; i++) {
@@ -51,27 +55,8 @@ Item {
         return Number(left.id) - Number(right.id);
     }
 
-    function appIcon(id) {
-        const key = String(id || "").toLowerCase();
-        if (key.includes("firefox") || key.includes("librewolf") || key.includes("zen")) return "󰈹";
-        if (key.includes("chrom") || key.includes("brave") || key.includes("vivaldi")) return "";
-        if (key.includes("code") || key.includes("codium")) return "󰨞";
-        if (key.includes("foot") || key.includes("kitty") || key.includes("alacritty") || key.includes("wezterm") || key.includes("terminal")) return "";
-        if (key.includes("thunar") || key.includes("nautilus") || key.includes("dolphin") || key.includes("files")) return "";
-        if (key.includes("obsidian")) return "󰠮";
-        if (key.includes("spotify")) return "";
-        if (key.includes("discord")) return "";
-        if (key.includes("telegram")) return "";
-        if (key.includes("steam")) return "";
-        if (key.includes("mpv") || key.includes("vlc")) return "󰎁";
-        if (key.includes("gimp") || key.includes("krita")) return "";
-        return key.length > 0 ? "󰣆" : "󰇄";
-    }
-
     function appName(id) {
-        const text = String(id || "").replace(/\.desktop$/i, "").replace(/-/g, " ");
-        if (text.length === 0) return "Desktop";
-        return text.charAt(0).toUpperCase() + text.slice(1);
+        return appIconResolver.displayName(id);
     }
 
     function cleanTitle(value) {
@@ -93,17 +78,8 @@ Item {
 
         anchors.verticalCenter: parent.verticalCenter
         spacing: settings.effectiveContentSpacing
-        visible: root.workspaceWindows.length > 0 || opacity > 0
-        opacity: root.workspaceWindows.length > 0 ? 1 : 0
-        scale: root.workspaceWindows.length > 0 ? 1 : 0.96
-
-        Behavior on opacity {
-            NumberAnimation { duration: settings.motionNormal; easing.type: root.workspaceWindows.length > 0 ? Easing.OutCubic : Easing.InCubic }
-        }
-
-        Behavior on scale {
-            NumberAnimation { duration: settings.motionNormal; easing.type: root.workspaceWindows.length > 0 ? Easing.OutCubic : Easing.InCubic }
-        }
+        visible: root.workspaceWindows.length > 0
+        opacity: 1
 
         Repeater {
             model: root.workspaceWindows.length
@@ -116,7 +92,6 @@ Item {
                 property var windowData: root.workspaceWindows[index]
                 property bool focused: windowData && Number(windowData.id) === Number(root.focusedWindow.id)
                 property bool showTitle: settings.focusedWindowDisplayMode === "focusedTitle" || (focused && settings.focusedWindowShowTitle && settings.focusedWindowDisplayMode !== "iconsOnly")
-                property bool entered: false
 
                 width: Math.max(settings.moduleHeight,
                                 appContent.implicitWidth + settings.effectivePillPadding * 2)
@@ -129,16 +104,9 @@ Item {
                 border.color: focused ? theme.outlineActive : theme.transparent
                 border.width: settings.effectiveBorderWidth
                 antialiasing: true
-                opacity: entered ? 1 : 0
-                scale: entered ? (appHover.containsMouse ? 1.012 : 1) : 0.92
-
-                Component.onCompleted: entered = true
+                scale: appHover.containsMouse ? 1.012 : 1
 
                 Behavior on y {
-                    NumberAnimation { duration: settings.motionFast; easing.type: Easing.OutCubic }
-                }
-
-                Behavior on opacity {
                     NumberAnimation { duration: settings.motionFast; easing.type: Easing.OutCubic }
                 }
 
@@ -161,19 +129,14 @@ Item {
                     height: parent.height
                     spacing: appTitle.visible ? settings.effectiveContentSpacing : 0
 
-                    Text {
-                        height: appContent.height
-                        text: root.appIcon(appPill.windowData ? appPill.windowData.appId : "")
-                        color: appPill.focused ? theme.accent : theme.text
-                        font.family: settings.fontFamily
-                        font.pixelSize: settings.effectiveIconSize
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        transform: Translate { x: -Math.max(1, Math.round(settings.effectiveIconSize * 0.10)) }
-
-                        Behavior on color {
-                            ColorAnimation { duration: settings.motionNormal }
-                        }
+                    AppIconImage {
+                        width: settings.effectiveIconSize
+                        height: settings.effectiveIconSize
+                        y: Math.round((appContent.height - height) / 2)
+                        theme: root.theme
+                        settings: root.settings
+                        iconSource: appIconResolver.source(appPill.windowData ? appPill.windowData.appId : "")
+                        fallbackText: appIconResolver.initial(appPill.windowData ? appPill.windowData.appId : "")
                     }
 
                     Text {
@@ -215,55 +178,6 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.focusWindow(appPill.windowData)
                 }
-            }
-        }
-    }
-
-    Rectangle {
-        id: emptyPill
-
-        property bool shown: root.workspaceWindows.length === 0
-
-        anchors.verticalCenter: parent.verticalCenter
-        visible: shown || opacity > 0
-        width: settings.moduleHeight
-        height: settings.moduleHeight
-        radius: settings.effectivePillRadius
-        color: theme.surfaceMuted
-        border.color: theme.transparent
-        border.width: settings.effectiveBorderWidth
-        antialiasing: true
-        opacity: shown ? 1 : 0
-        scale: shown ? 1 : 0.92
-
-        Behavior on color {
-            ColorAnimation { duration: settings.motionNormal }
-        }
-
-        Behavior on border.color {
-            ColorAnimation { duration: settings.motionNormal }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: settings.motionNormal; easing.type: emptyPill.shown ? Easing.OutCubic : Easing.InCubic }
-        }
-
-        Behavior on scale {
-            NumberAnimation { duration: settings.motionNormal; easing.type: emptyPill.shown ? Easing.OutCubic : Easing.InCubic }
-        }
-
-        Text {
-            anchors.centerIn: parent
-            height: parent.height
-            text: "󰇄"
-            color: theme.textMuted
-            font.family: settings.fontFamily
-            font.pixelSize: settings.effectiveIconSize
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-
-            Behavior on color {
-                ColorAnimation { duration: settings.motionNormal }
             }
         }
     }
