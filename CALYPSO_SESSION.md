@@ -638,3 +638,110 @@ Date: 2026-07-19
 - Final idle CPU sample with launcher open and filtered on PID `4786`: `1.270s` CPU over `60.000s`, `2.117%` of one core.
 - Restored `settings.json` to `barStyle: solid`, `barPosition: top`, and `reduceMotion: false`.
 - Final log window had no Calypso/QML warnings or errors.
+
+## Phase 7 Follow-up: Launcher Options
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `SettingsPanel.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added a dedicated Launcher Options detail page under the Settings panel's Widgets page.
+- Reused the existing `launcherPanelWidth` and `launcherMaxResults` settings from the launcher plan so app-launcher configuration is available from the module Options flow, not only Advanced.
+- Shared the launcher range helpers between Advanced and the Launcher Options page.
+
+### Local Settings Applied
+
+- Added `dashboard` and `launcher` to the local ignored `settings.json` right-side module list, before `settings`.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Captured right-side dashboard and launcher triggers at `/tmp/calypso-dashboard-launcher-right.png`.
+- Final log window had no Calypso/QML warnings or errors.
+
+## Phase 7 Follow-up: Launcher Settings
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `LauncherPanel.qml`
+- `Settings.qml`
+- `SettingsPanel.qml`
+- `settings.example.json`
+- `README.md`
+- `CALYPSO_SESSION.md`
+
+### Research Notes
+
+- Checked Caelestia's launcher config pattern: enabled state, max shown results, fuzzy matching controls, favourite apps, hidden apps, and vim keybinds.
+- Checked Noctalia's launcher/settings pattern: categories, app icons, compact rows, app grid, usage sorting, provider prefix, and normal settings-registry entries.
+- Checked Quickshell `DesktopEntries`/`DesktopEntry` docs before touching launcher filtering and execution.
+
+### Features Added
+
+- Added flat Calypso settings keys for launcher behavior: `launcherSearchPlaceholder`, `launcherUseFuzzy`, `launcherSortMode`, `launcherShowIcons`, `launcherShowDescriptions`, `launcherCompactRows`, `launcherVimKeybinds`, `launcherCloseOnLaunch`, `launcherFavorites`, and `launcherHiddenApps`.
+- Added sane defaults in `Settings.qml` and `settings.example.json`, preserving old configs that do not have these keys yet.
+- Added a reusable launcher settings block and exposed it in both Advanced and the Launcher module Options page.
+- Wired launcher behavior to the new settings: substring/fuzzy matching, alphabetical/relevance sorting, favorite pinning for empty searches, configured hidden app filtering, icon/description visibility, compact rows, optional vim-style navigation, placeholder text, and optional close-after-launch.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Opened the live Launcher Options page and captured `/tmp/calypso-launcher-settings-proper.png`.
+- Opened the live Advanced page and captured `/tmp/calypso-launcher-settings-advanced.png`.
+- Opened the live launcher with query `fire` and captured `/tmp/calypso-launcher-settings-result-defaults.png`.
+- Checked `/run/user/1000/quickshell/by-id/yo3gudfit/log.qslog`; no WARN/ERROR/QML type or reference errors after instantiating the settings page and launcher.
+- No new polling interval or idle animation was added, so no idle CPU sample was required for this follow-up.
+
+## Phase 7 Follow-up: Launcher Sidebar Page
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `SettingsPanel.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added Launcher as its own first-class Settings sidebar page between Widgets and OSD.
+- Reused the existing launcher settings rows on the new page, including the module enabled toggle.
+- Removed the duplicate Launcher block from Advanced so launcher controls are not buried in two places.
+- Kept the existing Widgets -> Launcher Options route working for module-level configuration.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Ran `git diff --check`.
+- Opened the live Launcher settings page through IPC and captured `/tmp/calypso-settings-launcher-sidebar-page.png`.
+- Checked `/run/user/1000/quickshell/by-id/yo3gudfit/log.qslog`; no WARN/ERROR/QML type or reference errors after opening the page.
+
+## Phase 7 Follow-up: Dashboard and Notifications Sidebar Pages
+
+Date: 2026-07-19
+
+### Files Changed
+
+- `SettingsPanel.qml`
+- `CALYPSO_SESSION.md`
+
+### Features Added
+
+- Added Dashboard and Notifications as first-class Settings sidebar pages.
+- Moved Dashboard controls out of Advanced and into the Dashboard page.
+- Moved Notifications controls out of Advanced and into the Notifications page.
+- Reused shared row components for Dashboard and Notifications settings so the page implementations stay consistent with Launcher.
+
+### Verification
+
+- Validated `settings.json` and `settings.example.json` with `python3 -m json.tool`.
+- Ran `git diff --check`.
+- Opened the live Dashboard settings page and captured `/tmp/calypso-settings-dashboard-sidebar-page.png`.
+- Opened the live Notifications settings page and captured `/tmp/calypso-settings-notifications-sidebar-page.png`.
+- Checked `/run/user/1000/quickshell/by-id/yo3gudfit/log.qslog`; no WARN/ERROR/QML type or reference errors after opening both pages.

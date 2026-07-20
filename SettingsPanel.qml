@@ -36,6 +36,9 @@ PopupWindow {
         { "id": "layout", "label": "Layout", "icon": "󰙀", "tags": "spacing radius height margin padding width modules" },
         { "id": "modules", "label": "Modules", "icon": "󱂬", "tags": "left center right reorder visibility" },
         { "id": "widgets", "label": "Widgets", "icon": "󰃭", "tags": "clock audio network battery cpu memory media tray" },
+        { "id": "dashboard", "label": "Dashboard", "icon": "󰒓", "tags": "controls quick toggles media weather performance rows refresh" },
+        { "id": "launcher", "label": "Launcher", "icon": "󰀻", "tags": "apps search desktop entries fuzzy favorites hidden icons compact" },
+        { "id": "notifications", "label": "Notifications", "icon": "󰂚", "tags": "drawer cards grouping bodies images actions notify" },
         { "id": "osd", "label": "OSD", "icon": "󰕾", "tags": "volume brightness function keys overlay" },
         { "id": "wallpaper", "label": "Wallpaper", "icon": "󰸉", "tags": "matugen awww colors transition random" },
         { "id": "motion", "label": "Motion", "icon": "󱡫", "tags": "animation reduce performance tooltip toast" },
@@ -135,6 +138,26 @@ PopupWindow {
             if (pages[i].id === pageId) return true;
         }
         return false;
+    }
+
+    function launcherPanelMinWidth() {
+        return Math.round(settings.effectiveSpacingXL * 14);
+    }
+
+    function launcherPanelMaxWidth() {
+        return Math.round(settings.effectiveSpacingXL * 34);
+    }
+
+    function launcherPanelWidthStep() {
+        return Math.max(1, Math.round(settings.effectiveSpacingM));
+    }
+
+    function launcherMinResults() {
+        return Math.max(1, Math.round(settings.effectiveSpacingXS));
+    }
+
+    function launcherMaxResultsLimit() {
+        return Math.max(launcherMinResults(), Math.round(settings.effectiveSpacingXL * 1.25));
     }
 
     function showPage(page) {
@@ -319,6 +342,9 @@ PopupWindow {
         if (detailOpen && settings) return settings.moduleCategory(detailPage) + " / " + settings.moduleCost(detailPage);
         if (activePage === "wallpaper") return wallpaper.wallpapers.length + " images";
         if (activePage === "osd") return settings.osdEnabled ? displayLabel(settings.osdPosition) : "disabled";
+        if (activePage === "dashboard") return settings.dashboardQuickToggles.length + " toggles / " + settings.dashboardPerformanceModules.length + " rows";
+        if (activePage === "launcher") return settings.launcherMaxResults + " results / " + (settings.launcherUseFuzzy ? "fuzzy" : "substring");
+        if (activePage === "notifications") return settings.notificationsMaxVisible + " cards / " + (settings.notificationsGroupByApp ? "grouped" : "flat");
         if (activePage === "appearance") return displayLabel(settings.barStyle) + " / " + displayLabel(settings.barPosition);
         if (activePage === "modules") return settings.leftModules.length + " / " + settings.centerModules.length + " / " + settings.rightModules.length;
         return "Calypso";
@@ -329,6 +355,9 @@ PopupWindow {
         if (page === "layout") return layoutPage;
         if (page === "modules") return modulesPage;
         if (page === "widgets") return widgetsPage;
+        if (page === "dashboard") return dashboardPage;
+        if (page === "launcher") return launcherPage;
+        if (page === "notifications") return notificationsPage;
         if (page === "osd") return osdPage;
         if (page === "wallpaper") return wallpaperPage;
         if (page === "motion") return motionPage;
@@ -351,6 +380,7 @@ PopupWindow {
         if (page === "notepad") return notepadDetail;
         if (page === "clipboard") return clipboardDetail;
         if (page === "processes") return processesDetail;
+        if (page === "launcher") return launcherDetail;
         if (page === "tray") return trayDetail;
         return genericDetail;
     }
@@ -387,9 +417,16 @@ PopupWindow {
     implicitWidth: panelWindow ? panelWindow.width : panelWidth
     implicitHeight: availableHeight()
     visible: panelOpen || panelClosing
-    grabFocus: anchorItem !== null
+    grabFocus: panelOpen
     color: "transparent"
     onVisibleChanged: if (!visible) closeRequested()
+
+    Shortcut {
+        sequences: [StandardKey.Cancel]
+        enabled: root.panelOpen
+        context: Qt.WindowShortcut
+        onActivated: root.close()
+    }
 
     WallpaperService {
         id: wallpaper
@@ -1049,6 +1086,74 @@ PopupWindow {
     }
 
     Component {
+        id: launcherPage
+
+        Column {
+            width: pageLoader.width
+            spacing: settings.panelPadding
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                title: "Launcher"
+
+                LauncherSettingsRows {
+                    width: parent.width
+                    theme: root.theme
+                    settings: root.settings
+                    showEnabled: true
+                }
+            }
+        }
+    }
+
+    Component {
+        id: dashboardPage
+
+        Column {
+            width: pageLoader.width
+            spacing: settings.panelPadding
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                title: "Dashboard"
+
+                DashboardSettingsRows {
+                    width: parent.width
+                    theme: root.theme
+                    settings: root.settings
+                    showEnabled: true
+                }
+            }
+        }
+    }
+
+    Component {
+        id: notificationsPage
+
+        Column {
+            width: pageLoader.width
+            spacing: settings.panelPadding
+
+            SectionBlock {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                title: "Notifications"
+
+                NotificationsSettingsRows {
+                    width: parent.width
+                    theme: root.theme
+                    settings: root.settings
+                }
+            }
+        }
+    }
+
+    Component {
         id: osdPage
 
         Column {
@@ -1230,22 +1335,6 @@ PopupWindow {
                 width: parent.width
                 theme: root.theme
                 settings: root.settings
-                title: "Dashboard"
-
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Media card"; checked: settings.dashboardShowMedia; onToggled: function(checked) { settings.setValue("dashboardShowMedia", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Weather card"; checked: settings.dashboardShowWeather; onToggled: function(checked) { settings.setValue("dashboardShowWeather", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Grow from trigger"; checked: settings.dashboardGrowFromTrigger; onToggled: function(checked) { settings.setValue("dashboardGrowFromTrigger", checked); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.dashboardPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("dashboardPanelWidth", value, minimum, maximum); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Media refresh"; value: settings.dashboardMediaPollMs; minimum: 250; maximum: 2000; step: 50; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardMediaMs", value, minimum, maximum); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Toggle refresh"; value: settings.dashboardStatePollMs; minimum: 1000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardStateMs", value, minimum, maximum); } }
-                TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Quick toggles"; value: Array.from(settings.dashboardQuickToggles || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardQuickToggles", root.csvList(text)); } }
-                TextInputRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Performance rows"; value: Array.from(settings.dashboardPerformanceModules || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardPerformanceModules", root.csvList(text)); } }
-            }
-
-            SectionBlock {
-                width: parent.width
-                theme: root.theme
-                settings: root.settings
                 title: "Module popups"
 
                 ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Pinned popups"; checked: settings.modulePopupPinned; onToggled: function(checked) { settings.setValue("modulePopupPinned", checked); } }
@@ -1268,31 +1357,6 @@ PopupWindow {
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Clipboard items"; value: settings.clipboardMaxItems; minimum: 5; maximum: 60; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("clipboardMaxItems", value, minimum, maximum); } }
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Process polling"; value: settings.processListPollMs; minimum: 2000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("processListMs", value, minimum, maximum); } }
                 SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Process rows"; value: settings.processListLimit; minimum: 6; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("processListLimit", value, minimum, maximum); } }
-            }
-
-            SectionBlock {
-                width: parent.width
-                theme: root.theme
-                settings: root.settings
-                title: "Notifications"
-
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Group by app"; checked: settings.notificationsGroupByApp; onToggled: function(checked) { settings.setValue("notificationsGroupByApp", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Groups expanded"; checked: settings.notificationsGroupsExpanded; onToggled: function(checked) { settings.setValue("notificationsGroupsExpanded", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Bodies"; checked: settings.notificationsShowBody; onToggled: function(checked) { settings.setValue("notificationsShowBody", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Images"; checked: settings.notificationsShowImages; onToggled: function(checked) { settings.setValue("notificationsShowImages", checked); } }
-                ToggleRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Actions"; checked: settings.notificationsShowActions; onToggled: function(checked) { settings.setValue("notificationsShowActions", checked); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Drawer width"; value: settings.notificationsPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("notificationsPanelWidth", value, minimum, maximum); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Max cards"; value: settings.notificationsMaxVisible; minimum: 6; maximum: 80; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("notificationsMaxVisible", value, minimum, maximum); } }
-            }
-
-            SectionBlock {
-                width: parent.width
-                theme: root.theme
-                settings: root.settings
-                title: "Launcher"
-
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.launcherPanelWidth; minimum: Math.round(settings.effectiveSpacingXL * 14); maximum: Math.round(settings.effectiveSpacingXL * 34); step: Math.max(1, Math.round(settings.effectiveSpacingM)); suffix: "px"; onValueRequested: function(value) { settings.setNumber("launcherPanelWidth", value, minimum, maximum); } }
-                SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Max results"; value: settings.launcherMaxResults; minimum: 4; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("launcherMaxResults", value, minimum, maximum); } }
             }
 
             SectionBlock {
@@ -1476,6 +1540,119 @@ PopupWindow {
             SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Rows"; value: settings.processListLimit; minimum: 6; maximum: 30; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("processListLimit", value, minimum, maximum); } }
             SliderRow { width: parent.width; theme: root.theme; settings: root.settings; label: "Panel width"; value: settings.processPanelWidth; minimum: 380; maximum: 820; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("processPanelWidth", value, minimum, maximum); } }
         }
+    }
+
+    Component {
+        id: launcherDetail
+        WidgetDetailBase {
+            moduleName: "launcher"
+
+            LauncherSettingsRows {
+                width: parent.width
+                theme: root.theme
+                settings: root.settings
+                showEnabled: true
+            }
+        }
+    }
+
+    component DashboardSettingsRows: Column {
+        id: dashboardRows
+
+        property var theme
+        property var settings
+        property bool showEnabled: false
+
+        spacing: settings.effectiveContentSpacing
+
+        ToggleRow {
+            width: parent.width
+            visible: dashboardRows.showEnabled
+            theme: dashboardRows.theme
+            settings: dashboardRows.settings
+            label: "Enabled"
+            checked: settings.enabled("dashboard")
+            onToggled: function(checked) { settings.setModuleEnabled("dashboard", checked); }
+        }
+
+        ToggleRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Media card"; checked: settings.dashboardShowMedia; onToggled: function(checked) { settings.setValue("dashboardShowMedia", checked); } }
+        ToggleRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Weather card"; checked: settings.dashboardShowWeather; onToggled: function(checked) { settings.setValue("dashboardShowWeather", checked); } }
+        ToggleRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Grow from trigger"; checked: settings.dashboardGrowFromTrigger; onToggled: function(checked) { settings.setValue("dashboardGrowFromTrigger", checked); } }
+        SliderRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Panel width"; value: settings.dashboardPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("dashboardPanelWidth", value, minimum, maximum); } }
+        SliderRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Media refresh"; value: settings.dashboardMediaPollMs; minimum: 250; maximum: 2000; step: 50; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardMediaMs", value, minimum, maximum); } }
+        SliderRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Toggle refresh"; value: settings.dashboardStatePollMs; minimum: 1000; maximum: 30000; step: 500; suffix: "ms"; onValueRequested: function(value) { settings.setPollingInterval("dashboardStateMs", value, minimum, maximum); } }
+        TextInputRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Quick toggles"; value: Array.from(settings.dashboardQuickToggles || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardQuickToggles", root.csvList(text)); } }
+        TextInputRow { width: parent.width; theme: dashboardRows.theme; settings: dashboardRows.settings; label: "Performance rows"; value: Array.from(settings.dashboardPerformanceModules || []).join(", "); onTextRequested: function(text) { settings.setStringList("dashboardPerformanceModules", root.csvList(text)); } }
+    }
+
+    component NotificationsSettingsRows: Column {
+        id: notificationRows
+
+        property var theme
+        property var settings
+
+        spacing: settings.effectiveContentSpacing
+
+        ToggleRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Group by app"; checked: settings.notificationsGroupByApp; onToggled: function(checked) { settings.setValue("notificationsGroupByApp", checked); } }
+        ToggleRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Groups expanded"; checked: settings.notificationsGroupsExpanded; onToggled: function(checked) { settings.setValue("notificationsGroupsExpanded", checked); } }
+        ToggleRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Bodies"; checked: settings.notificationsShowBody; onToggled: function(checked) { settings.setValue("notificationsShowBody", checked); } }
+        ToggleRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Images"; checked: settings.notificationsShowImages; onToggled: function(checked) { settings.setValue("notificationsShowImages", checked); } }
+        ToggleRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Actions"; checked: settings.notificationsShowActions; onToggled: function(checked) { settings.setValue("notificationsShowActions", checked); } }
+        SliderRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Drawer width"; value: settings.notificationsPanelWidth; minimum: 320; maximum: 720; step: 20; suffix: "px"; onValueRequested: function(value) { settings.setNumber("notificationsPanelWidth", value, minimum, maximum); } }
+        SliderRow { width: parent.width; theme: notificationRows.theme; settings: notificationRows.settings; label: "Max cards"; value: settings.notificationsMaxVisible; minimum: 6; maximum: 80; step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("notificationsMaxVisible", value, minimum, maximum); } }
+    }
+
+    component LauncherSettingsRows: Column {
+        id: launcherRows
+
+        property var theme
+        property var settings
+        property bool showEnabled: false
+
+        spacing: settings.effectiveContentSpacing
+
+        ToggleRow {
+            width: parent.width
+            visible: launcherRows.showEnabled
+            theme: launcherRows.theme
+            settings: launcherRows.settings
+            label: "Enabled"
+            checked: settings.enabled("launcher")
+            onToggled: function(checked) { settings.setModuleEnabled("launcher", checked); }
+        }
+
+        SliderRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Panel width"; value: settings.launcherPanelWidth; minimum: root.launcherPanelMinWidth(); maximum: root.launcherPanelMaxWidth(); step: root.launcherPanelWidthStep(); suffix: "px"; onValueRequested: function(value) { settings.setNumber("launcherPanelWidth", value, minimum, maximum); } }
+        SliderRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Max results"; value: settings.launcherMaxResults; minimum: root.launcherMinResults(); maximum: root.launcherMaxResultsLimit(); step: 1; suffix: ""; onValueRequested: function(value) { settings.setNumber("launcherMaxResults", value, minimum, maximum); } }
+
+        ChoiceRow {
+            width: parent.width
+            theme: launcherRows.theme
+            settings: launcherRows.settings
+            label: "Search"
+            value: settings.launcherUseFuzzy ? "fuzzy" : "substring"
+            choices: ["fuzzy", "substring"]
+            onChoiceRequested: function(choice) { settings.setValue("launcherUseFuzzy", choice === "fuzzy"); }
+        }
+
+        ChoiceRow {
+            width: parent.width
+            theme: launcherRows.theme
+            settings: launcherRows.settings
+            label: "Sort"
+            value: settings.launcherSortMode
+            choices: ["relevance", "alphabetical"]
+            onChoiceRequested: function(choice) { settings.setEnum("launcherSortMode", choice, choices, "relevance"); }
+        }
+
+        ToggleRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "App icons"; checked: settings.launcherShowIcons; onToggled: function(checked) { settings.setValue("launcherShowIcons", checked); } }
+        ToggleRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Descriptions"; checked: settings.launcherShowDescriptions; onToggled: function(checked) { settings.setValue("launcherShowDescriptions", checked); } }
+        ToggleRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Compact rows"; checked: settings.launcherCompactRows; onToggled: function(checked) { settings.setValue("launcherCompactRows", checked); } }
+        ToggleRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Vim navigation"; checked: settings.launcherVimKeybinds; onToggled: function(checked) { settings.setValue("launcherVimKeybinds", checked); } }
+        ToggleRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Close after launch"; checked: settings.launcherCloseOnLaunch; onToggled: function(checked) { settings.setValue("launcherCloseOnLaunch", checked); } }
+
+        TextInputRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Placeholder"; value: settings.launcherSearchPlaceholder; onTextRequested: function(text) { settings.setString("launcherSearchPlaceholder", text); } }
+        TextInputRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Favorites"; value: Array.from(settings.launcherFavorites || []).join(", "); onTextRequested: function(text) { settings.setStringList("launcherFavorites", root.csvList(text)); } }
+        TextInputRow { width: parent.width; theme: launcherRows.theme; settings: launcherRows.settings; label: "Hidden apps"; value: Array.from(settings.launcherHiddenApps || []).join(", "); onTextRequested: function(text) { settings.setStringList("launcherHiddenApps", root.csvList(text)); } }
     }
 
     Component {

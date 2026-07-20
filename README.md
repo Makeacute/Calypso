@@ -118,7 +118,9 @@ Widget options:
 - `processPanelWidth`, `processListLimit`, `polling.processListMs`
 - `notificationsPanelWidth`, `notificationsMaxVisible`, `notificationsGroupByApp`, `notificationsGroupsExpanded`
 - `notificationsShowBody`, `notificationsShowImages`, `notificationsShowActions`
-- `launcherPanelWidth`, `launcherMaxResults`
+- `launcherPanelWidth`, `launcherMaxResults`, `launcherSearchPlaceholder`
+- `launcherUseFuzzy`, `launcherSortMode`, `launcherShowIcons`, `launcherShowDescriptions`, `launcherCompactRows`
+- `launcherVimKeybinds`, `launcherCloseOnLaunch`, `launcherFavorites`, `launcherHiddenApps`
 - `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
 - `cpuShowGraph`, `memoryShowGraph`
 - `brightnessShowPercentage`, `brightnessStep`

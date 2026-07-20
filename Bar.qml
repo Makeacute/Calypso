@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import Quickshell.Wayland
 import QtQuick
 import "services"
 import "widgets"
@@ -13,6 +14,15 @@ PanelWindow {
     required property var modelData
     readonly property bool settingsOpen: settingsPanelLoader.item ? settingsPanelLoader.item.visible : false
     readonly property bool notificationsOpen: notificationPanelLoader.item ? notificationPanelLoader.item.visible : false
+    readonly property bool anyPanelOpen: panelIsOpen(settingsPanelLoader)
+                                      || panelIsOpen(clockPanelLoader)
+                                      || panelIsOpen(dashboardPanelLoader)
+                                      || panelIsOpen(moduleDetailsPanelLoader)
+                                      || panelIsOpen(notepadPanelLoader)
+                                      || panelIsOpen(clipboardPanelLoader)
+                                      || panelIsOpen(processPanelLoader)
+                                      || panelIsOpen(notificationPanelLoader)
+                                      || panelIsOpen(launcherPanelLoader)
     readonly property var trackedNotifications: notificationServer.trackedNotifications ? notificationServer.trackedNotifications.values : []
     readonly property int notificationCount: trackedNotifications.length
     property bool backgroundPhaseReady: false
@@ -41,6 +51,19 @@ PanelWindow {
         const item = loader.item;
         if (item && typeof item.close === "function")
             item.close();
+    }
+
+    function panelIsOpen(loader) {
+        const item = loader.item;
+        return item && (item.panelOpen || item.visible);
+    }
+
+    function closeAllPanels() {
+        closeLoadedPanel(settingsPanelLoader);
+        closeLoadedPanel(clockPanelLoader);
+        closeLoadedPanel(dashboardPanelLoader);
+        closeLoadedPanel(moduleDetailsPanelLoader);
+        closeToolPanels();
     }
 
     function closeToolPanels() {
@@ -508,9 +531,24 @@ PanelWindow {
     margins.right: settings.screenMargin
     implicitHeight: settings.barHeight
     exclusiveZone: bar.reservedEdgeSize
-    focusable: false
     aboveWindows: true
     color: "transparent"
+
+    WlrLayershell.keyboardFocus: bar.anyPanelOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    onAnyPanelOpenChanged: if (bar.anyPanelOpen) escapeKeyHandler.forceActiveFocus()
+
+    Item {
+        id: escapeKeyHandler
+
+        anchors.fill: parent
+        focus: bar.anyPanelOpen
+        Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape && bar.anyPanelOpen) {
+                bar.closeAllPanels();
+                event.accepted = true;
+            }
+        }
+    }
 
     Item {
         id: barContent

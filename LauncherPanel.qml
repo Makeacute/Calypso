@@ -63,27 +63,115 @@ PopupWindow {
         return DesktopEntries.applications ? Array.from(DesktopEntries.applications.values || []) : [];
     }
 
+    function appLabel(entry) {
+        return String(entry && entry.name ? entry.name : "");
+    }
+
+    function appSubtitle(entry) {
+        return String(entry && entry.comment ? entry.comment : entry && entry.genericName ? entry.genericName : "");
+    }
+
+    function entryKeys(entry) {
+        return [
+            String(entry && entry.id ? entry.id : ""),
+            appLabel(entry),
+            String(entry && entry.genericName ? entry.genericName : ""),
+            String(entry && entry.comment ? entry.comment : ""),
+            String(entry && entry.icon ? entry.icon : ""),
+            String(entry && entry.startupClass ? entry.startupClass : ""),
+            String(entry && entry.execString ? entry.execString : ""),
+            Array.from(entry && entry.command ? entry.command : []).join(" ")
+        ].filter(key => key.length > 0);
+    }
+
+    function matchesPattern(entry, pattern) {
+        const needle = normalize(pattern);
+        if (needle.length <= 0) return false;
+
+        const keys = entryKeys(entry);
+        for (let i = 0; i < keys.length; i++) {
+            const key = normalize(keys[i]);
+            if (key === needle || key.indexOf(needle) >= 0)
+                return true;
+        }
+        return false;
+    }
+
+    function favoriteRank(entry) {
+        const favorites = Array.from(settings ? settings.launcherFavorites : []);
+        for (let i = 0; i < favorites.length; i++) {
+            if (matchesPattern(entry, favorites[i]))
+                return i;
+        }
+        return -1;
+    }
+
+    function hiddenBySettings(entry) {
+        const hidden = Array.from(settings ? settings.launcherHiddenApps : []);
+        for (let i = 0; i < hidden.length; i++) {
+            if (matchesPattern(entry, hidden[i]))
+                return true;
+        }
+        return false;
+    }
+
     function validEntry(entry) {
-        if (!entry || entry.noDisplay) return false;
+        if (!entry || entry.noDisplay || hiddenBySettings(entry)) return false;
         if (String(entry.name || "").length <= 0) return false;
         return Array.from(entry.command || []).length > 0 || String(entry.execString || "").length > 0;
+    }
+
+    function substringScore(entry, search) {
+        const rawQuery = String(search || "").trim();
+        if (rawQuery.length <= 0) return 1;
+
+        const queryText = normalize(rawQuery);
+        const nameText = normalize(entry && entry.name ? entry.name : "");
+        const haystack = normalize(entryText(entry));
+        if (queryText.length <= 0) return 1;
+
+        const nameIndex = nameText.indexOf(queryText);
+        if (nameIndex >= 0)
+            return 900 - nameIndex + (nameIndex === 0 ? 300 : 0);
+
+        const haystackIndex = haystack.indexOf(queryText);
+        return haystackIndex >= 0 ? 600 - haystackIndex : -1;
+    }
+
+    function matchScore(entry, search) {
+        return settings && !settings.launcherUseFuzzy ? substringScore(entry, search) : fuzzyScore(entry, search);
     }
 
     function filteredEntries() {
         const apps = allApplications();
         const search = query;
+        const hasSearch = String(search || "").trim().length > 0;
+        const sortMode = String(settings ? settings.launcherSortMode : "relevance");
         const scored = [];
         for (let i = 0; i < apps.length; i++) {
             const entry = apps[i];
             if (!validEntry(entry)) continue;
-            const score = fuzzyScore(entry, search);
+            const score = matchScore(entry, search);
             if (score < 0) continue;
-            scored.push({ "entry": entry, "score": score });
+            scored.push({ "entry": entry, "score": score, "favoriteIndex": favoriteRank(entry) });
         }
 
         scored.sort((a, b) => {
+            if (!hasSearch && a.favoriteIndex !== b.favoriteIndex) {
+                if (a.favoriteIndex >= 0 && b.favoriteIndex >= 0) return a.favoriteIndex - b.favoriteIndex;
+                if (a.favoriteIndex >= 0) return -1;
+                if (b.favoriteIndex >= 0) return 1;
+            }
+
+            const nameCompare = appLabel(a.entry).localeCompare(appLabel(b.entry));
+            if (sortMode === "alphabetical") return nameCompare;
             if (b.score !== a.score) return b.score - a.score;
-            return String(a.entry.name || "").localeCompare(String(b.entry.name || ""));
+            if (a.favoriteIndex !== b.favoriteIndex) {
+                if (a.favoriteIndex >= 0 && b.favoriteIndex >= 0) return a.favoriteIndex - b.favoriteIndex;
+                if (a.favoriteIndex >= 0) return -1;
+                if (b.favoriteIndex >= 0) return 1;
+            }
+            return nameCompare;
         });
 
         const max = Math.max(1, Number(settings ? settings.launcherMaxResults : 0) || 12);
@@ -129,7 +217,8 @@ PopupWindow {
     function launch(entry) {
         if (!entry || typeof entry.execute !== "function") return;
         entry.execute();
-        close();
+        if (!settings || settings.launcherCloseOnLaunch)
+            close();
     }
 
     function launchSelected() {
@@ -175,6 +264,13 @@ PopupWindow {
     visible: panelOpen || panelClosing
     grabFocus: panelOpen
     color: theme.transparent
+
+    Shortcut {
+        sequences: [StandardKey.Cancel]
+        enabled: root.panelOpen
+        context: Qt.WindowShortcut
+        onActivated: root.close()
+    }
 
     Timer {
         id: closeTimer
@@ -286,10 +382,10 @@ PopupWindow {
                             if (event.key === Qt.Key_Escape) {
                                 root.close();
                                 event.accepted = true;
-                            } else if (event.key === Qt.Key_Down) {
+                            } else if (event.key === Qt.Key_Down || (settings && settings.launcherVimKeybinds && (event.key === Qt.Key_J || event.key === Qt.Key_N) && (event.modifiers & Qt.ControlModifier)) || (settings && settings.launcherVimKeybinds && event.key === Qt.Key_Tab && !(event.modifiers & Qt.ShiftModifier))) {
                                 root.selectNext(1);
                                 event.accepted = true;
-                            } else if (event.key === Qt.Key_Up) {
+                            } else if (event.key === Qt.Key_Up || (settings && settings.launcherVimKeybinds && (event.key === Qt.Key_K || event.key === Qt.Key_P) && (event.modifiers & Qt.ControlModifier)) || (settings && settings.launcherVimKeybinds && (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))))) {
                                 root.selectNext(-1);
                                 event.accepted = true;
                             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -305,7 +401,7 @@ PopupWindow {
                     anchors.leftMargin: settings.controlHeight + settings.effectiveContentSpacing * 2
                     anchors.verticalCenter: parent.verticalCenter
                     visible: searchField.text.length <= 0
-                    text: "Search apps"
+                    text: settings.launcherSearchPlaceholder
                     color: theme.textMuted
                     font.family: settings.fontFamilySans
                     font.pixelSize: settings.effectiveFontSize
@@ -365,7 +461,12 @@ PopupWindow {
 
         signal pressed()
 
-        implicitHeight: settings.controlHeight * 1.55
+        readonly property bool showIcon: settings.launcherShowIcons
+        readonly property bool showSubtitle: settings.launcherShowDescriptions && !settings.launcherCompactRows && root.appSubtitle(entry).length > 0
+        readonly property bool favorite: root.favoriteRank(entry) >= 0
+        readonly property int visibleGapCount: (showIcon ? 1 : 0) + (favorite ? 1 : 0)
+
+        implicitHeight: settings.controlHeight + settings.effectiveContentSpacing * (settings.launcherCompactRows ? 2 : 3)
         radius: settings.effectivePillRadius
         color: selected ? theme.surfaceActive : hover.containsMouse ? theme.surfaceHover : theme.alpha(theme.surfaceContainer, 0.46)
         border.color: selected ? theme.outlineActive : theme.outlineSubtle
@@ -379,25 +480,33 @@ PopupWindow {
         Row {
             anchors.fill: parent
             anchors.margins: settings.effectiveContentSpacing
-            spacing: settings.effectiveContentSpacing
+            spacing: row.visibleGapCount > 0 ? settings.effectiveContentSpacing : 0
 
-            AppIconImage {
-                width: settings.controlHeight
+            Item {
+                id: iconSlot
+
+                width: visible ? settings.controlHeight : 0
                 height: settings.controlHeight
-                theme: row.theme
-                settings: row.settings
-                iconSource: root.iconSource(row.entry)
-                fallbackText: root.initial(row.entry)
+                anchors.verticalCenter: parent.verticalCenter
+                visible: row.showIcon
+
+                AppIconImage {
+                    anchors.fill: parent
+                    theme: row.theme
+                    settings: row.settings
+                    iconSource: root.iconSource(row.entry)
+                    fallbackText: root.initial(row.entry)
+                }
             }
 
             Column {
-                width: parent.width - settings.controlHeight - parent.spacing
+                width: Math.max(0, parent.width - iconSlot.width - favoriteMark.width - parent.spacing * row.visibleGapCount)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Math.max(1, Math.round(settings.effectiveContentSpacing * 0.25))
+                spacing: row.showSubtitle ? Math.max(settings.effectiveBorderWidth, settings.effectiveContentSpacing - settings.effectiveGroupPadding) : 0
 
                 Text {
                     width: parent.width
-                    text: String(row.entry && row.entry.name ? row.entry.name : "")
+                    text: root.appLabel(row.entry)
                     color: theme.text
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -408,13 +517,29 @@ PopupWindow {
 
                 Text {
                     width: parent.width
-                    text: String(row.entry && row.entry.comment ? row.entry.comment : row.entry && row.entry.genericName ? row.entry.genericName : "")
+                    height: visible ? implicitHeight : 0
+                    visible: row.showSubtitle
+                    text: root.appSubtitle(row.entry)
                     color: theme.textMuted
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     font.family: settings.fontFamilySans
                     font.pixelSize: Math.round(settings.effectiveFontSize * 0.84)
                 }
+            }
+
+            Text {
+                id: favoriteMark
+
+                width: row.favorite ? settings.controlHeight : 0
+                height: parent.height
+                visible: row.favorite
+                text: "󰓎"
+                color: theme.primary
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.family: settings.fontFamilyIcon
+                font.pixelSize: settings.effectiveIconSize
             }
         }
 

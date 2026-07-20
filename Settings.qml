@@ -142,6 +142,55 @@ Item {
         return Array.from(adapter[name] || []).indexOf(String(value || "")) >= 0;
     }
 
+    function normalizedStringList(values) {
+        return Array.from(values || []).map(value => String(value || "").trim()).filter(value => value.length > 0);
+    }
+
+    function supplementalModuleRegistry() {
+        return [
+            { "id": "dashboard", "label": "Dashboard", "icon": "󰒓", "category": "Shell", "aliases": ["controls", "controlCenter", "quickControls"], "defaultSection": "right", "defaultVisible": false, "configurable": false, "cost": "lazy", "capabilities": [] },
+            { "id": "launcher", "label": "Launcher", "icon": "󰀻", "category": "Shell", "aliases": ["apps", "appLauncher"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "lazy", "capabilities": ["desktopEntries", "fuzzySearch"] },
+            { "id": "notepad", "label": "Notepad", "icon": "󰎞", "category": "Shell", "aliases": ["scratchpad", "notes"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "lazy", "capabilities": ["autosave"] },
+            { "id": "clipboard", "label": "Clipboard", "icon": "󰅌", "category": "Shell", "aliases": ["cliphist", "clip"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["history", "images"] },
+            { "id": "processes", "label": "Processes", "icon": "󰒋", "category": "System", "aliases": ["processList", "tasks"], "defaultSection": "right", "defaultVisible": false, "configurable": true, "cost": "open polling", "capabilities": ["sort", "temperature"] }
+        ];
+    }
+
+    function mergedModuleRegistry(source) {
+        const merged = Array.from(source || []);
+        const seen = {};
+        for (let i = 0; i < merged.length; i++)
+            seen[String(merged[i].id || "")] = true;
+
+        const supplemental = supplementalModuleRegistry();
+        for (let j = 0; j < supplemental.length; j++) {
+            const id = String(supplemental[j].id || "");
+            if (!seen[id]) {
+                merged.push(supplemental[j]);
+                seen[id] = true;
+            }
+        }
+        return merged;
+    }
+
+    function mergedAvailableModules(source) {
+        const merged = [];
+        const sourceModules = Array.from(source || []);
+        for (let i = 0; i < sourceModules.length; i++) {
+            const id = moduleId(sourceModules[i]);
+            if (merged.indexOf(id) < 0)
+                merged.push(id);
+        }
+
+        const supplemental = supplementalModuleRegistry();
+        for (let j = 0; j < supplemental.length; j++) {
+            const id = String(supplemental[j].id || "");
+            if (merged.indexOf(id) < 0)
+                merged.push(id);
+        }
+        return merged;
+    }
+
     function moduleEntry(moduleName) {
         const entries = Array.from(moduleRegistry || []);
         for (let i = 0; i < entries.length; i++) {
@@ -164,6 +213,10 @@ Item {
         };
     }
 
+    function moduleId(moduleName) {
+        return String(moduleEntry(moduleName).id || moduleName);
+    }
+
     function moduleDefaultSection(moduleName) {
         const section = String(moduleEntry(moduleName).defaultSection || "right");
         return section === "left" || section === "center" || section === "right" ? section : "right";
@@ -182,10 +235,13 @@ Item {
     }
 
     function moduleUsed(moduleName) {
-        const name = String(moduleName || "");
-        return sectionModules("left").indexOf(name) >= 0
-            || sectionModules("center").indexOf(name) >= 0
-            || sectionModules("right").indexOf(name) >= 0;
+        const target = moduleId(moduleName);
+        const modules = sectionModules("left").concat(sectionModules("center")).concat(sectionModules("right"));
+        for (let i = 0; i < modules.length; i++) {
+            if (moduleId(modules[i]) === target)
+                return true;
+        }
+        return false;
     }
 
     function unusedModules() {
@@ -394,9 +450,10 @@ Item {
         if (moduleName === "settings") return adapter.showSettingsButton;
 
         const visibility = adapter.moduleVisibility || {};
-        const id = moduleEntry(moduleName).id;
+        const id = moduleId(moduleName);
         if (visibility[id] !== undefined) return visibility[id] !== false;
-        return visibility[moduleName] !== false;
+        if (visibility[moduleName] !== undefined) return visibility[moduleName] !== false;
+        return true;
     }
 
     function setModuleEnabled(moduleName, value) {
@@ -435,7 +492,13 @@ Item {
     }
 
     function hasModule(section, moduleName) {
-        return sectionModules(section).indexOf(moduleName) >= 0;
+        const target = moduleId(moduleName);
+        const modules = sectionModules(section);
+        for (let i = 0; i < modules.length; i++) {
+            if (moduleId(modules[i]) === target)
+                return true;
+        }
+        return false;
     }
 
     function canAddModule(section, moduleName) {
@@ -641,6 +704,16 @@ Item {
     property bool notificationsShowActions: adapter.notificationsShowActions
     property int launcherPanelWidth: adapter.launcherPanelWidth
     property int launcherMaxResults: adapter.launcherMaxResults
+    property string launcherSearchPlaceholder: adapter.launcherSearchPlaceholder
+    property bool launcherUseFuzzy: adapter.launcherUseFuzzy
+    property string launcherSortMode: adapter.launcherSortMode
+    property bool launcherShowIcons: adapter.launcherShowIcons
+    property bool launcherShowDescriptions: adapter.launcherShowDescriptions
+    property bool launcherCompactRows: adapter.launcherCompactRows
+    property bool launcherVimKeybinds: adapter.launcherVimKeybinds
+    property bool launcherCloseOnLaunch: adapter.launcherCloseOnLaunch
+    property var launcherFavorites: normalizedStringList(adapter.launcherFavorites)
+    property var launcherHiddenApps: normalizedStringList(adapter.launcherHiddenApps)
     property bool trayCompact: adapter.trayCompact
     property string focusedWindowDisplayMode: adapter.focusedWindowDisplayMode
     property bool workspaceShowNumbers: adapter.workspaceShowNumbers
@@ -683,8 +756,8 @@ Item {
     property string wallpaperLastPalette: adapter.wallpaperLastPalette
     property var compositor: adapter.compositor
     property string compositorBackend: (adapter.compositor && adapter.compositor.backend) ? adapter.compositor.backend : "auto"
-    property var moduleRegistry: adapter.moduleRegistry
-    property var availableModules: adapter.availableModules
+    property var moduleRegistry: mergedModuleRegistry(adapter.moduleRegistry)
+    property var availableModules: mergedAvailableModules(adapter.availableModules)
     property var leftModules: adapter.leftModules
     property var centerModules: adapter.centerModules
     property var rightModules: adapter.rightModules
@@ -850,6 +923,16 @@ Item {
             property bool notificationsShowActions: true
             property int launcherPanelWidth: 520
             property int launcherMaxResults: 12
+            property string launcherSearchPlaceholder: "Search apps"
+            property bool launcherUseFuzzy: true
+            property string launcherSortMode: "relevance"
+            property bool launcherShowIcons: true
+            property bool launcherShowDescriptions: true
+            property bool launcherCompactRows: false
+            property bool launcherVimKeybinds: false
+            property bool launcherCloseOnLaunch: true
+            property var launcherFavorites: []
+            property var launcherHiddenApps: []
             property bool trayCompact: true
             property string focusedWindowDisplayMode: "allWorkspaceApps"
             property bool workspaceShowNumbers: true

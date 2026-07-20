@@ -111,8 +111,15 @@ PopupWindow {
     implicitWidth: panelWindow ? panelWindow.width : panelWidth
     implicitHeight: notepadFrame.height
     visible: panelOpen || panelClosing
-    grabFocus: anchorItem !== null
+    grabFocus: panelOpen
     color: "transparent"
+
+    Shortcut {
+        sequences: [StandardKey.Cancel]
+        enabled: root.panelOpen
+        context: Qt.WindowShortcut
+        onActivated: root.close()
+    }
 
     Timer {
         id: closeTimer
