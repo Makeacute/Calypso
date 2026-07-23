@@ -4,7 +4,9 @@ Pill {
     id: root
 
     property date now: new Date()
-    property string effectiveClockFormat: settings ? settings.clockFormat : "HH:mm"
+    readonly property string effectiveClockFormat: moduleSettings.format === undefined
+                                                       ? (settings ? settings.clockFormat : "HH:mm")
+                                                       : String(moduleSettings.format)
 
     signal requested(var anchorItem)
 
@@ -16,7 +18,7 @@ Pill {
     textPulseOnChange: true
     textPulseMinimumOpacity: 0.4
     textPulseDuration: Math.max(0, theme.motionNormal)
-    maximumTextWidth: 150
+    maximumTextWidth: theme.moduleClockWidth
     onClicked: requested(root)
 
     function formatNeedsSubminuteUpdates() {

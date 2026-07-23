@@ -8,9 +8,13 @@ Row {
 
     property var theme
     property var settings
+    property string moduleInstanceId: ""
+    property var moduleSettings: ({})
     property var panelWindow
     property var trayItems: SystemTray.items.values
-    property int maxVisible: Math.max(1, settings.trayMaxVisible)
+    property int maxVisible: Math.max(1, moduleSettings.maxVisible === undefined ? settings.trayMaxVisible : Number(moduleSettings.maxVisible))
+    readonly property bool compact: moduleSettings.compact === undefined ? settings.trayCompact : Boolean(moduleSettings.compact)
+    readonly property int instanceIconSize: moduleSettings.iconSize === undefined ? settings.effectiveTrayIconSize : Number(moduleSettings.iconSize)
     property var visibleItems: Array.from(trayItems || []).slice(0, maxVisible)
     property var hiddenItems: Array.from(trayItems || []).slice(maxVisible)
     property bool hasItems: trayItems.length > 0
@@ -49,6 +53,8 @@ Row {
             settings: root.settings
             panelWindow: root.panelWindow
             itemData: modelData
+            compact: root.compact
+            iconSize: root.instanceIconSize
         }
     }
 
@@ -105,7 +111,7 @@ Row {
         implicitWidth: root.panelWindow ? root.panelWindow.width : overflowPopupSurface.width
         implicitHeight: overflowPopupSurface.height
         visible: root.overflowOpen && root.hiddenItems.length > 0
-        color: "transparent"
+        color: theme.transparent
 
         MouseArea {
             anchors.fill: parent
@@ -126,7 +132,7 @@ Row {
             radius: settings.effectiveRadiusL
             color: theme.alpha(theme.surfaceContainerHigh, settings.barOpacity)
             border.color: settings.barBorderEnabled ? theme.border : theme.outlineSubtle
-            border.width: settings.barBorderEnabled ? settings.barBorderThickness : 1
+            border.width: settings.barBorderEnabled ? settings.barBorderThickness : settings.effectiveBorderWidth
             opacity: root.overflowOpen ? 1 : 0
             antialiasing: true
 
@@ -152,6 +158,8 @@ Row {
                         settings: root.settings
                         panelWindow: root.panelWindow
                         itemData: modelData
+                        compact: root.compact
+                        iconSize: root.instanceIconSize
                     }
                 }
             }
@@ -165,8 +173,10 @@ Row {
         property var settings
         property var panelWindow
         property var itemData
+        property bool compact: true
+        property int iconSize: settings.effectiveTrayIconSize
 
-        width: settings.trayCompact ? settings.moduleHeight : Math.max(settings.moduleHeight, settings.effectiveTrayIconSize + settings.effectivePillPadding * 2)
+        width: compact ? settings.moduleHeight : Math.max(settings.moduleHeight, iconSize + settings.effectivePillPadding * 2)
         height: width
         radius: settings.effectivePillRadius
         color: hoverArea.containsMouse ? theme.surfaceHover : theme.transparent
@@ -194,9 +204,9 @@ Row {
 
         IconImage {
             anchors.centerIn: parent
-            implicitSize: settings.effectiveIconSize
-            width: settings.effectiveIconSize
-            height: settings.effectiveIconSize
+            implicitSize: trayItem.iconSize
+            width: trayItem.iconSize
+            height: trayItem.iconSize
             source: trayItem.itemData ? trayItem.itemData.icon : ""
             asynchronous: true
         }

@@ -11,25 +11,58 @@ PopupWindow {
     property var theme
     property var settings
     property var panelWindow
+    property var systemStatsService: null
+    property var networkService: null
+    property var batteryService: null
+    property var mediaService: null
     property var anchorItem: null
     property bool panelOpen: false
     property bool panelClosing: false
     property string selectedModule: ""
     property var quickState: ({})
-    property var mediaData: ({})
-    property var cpuData: ({})
-    property var memoryData: ({})
-    property var networkData: ({})
-    property var batteryData: ({})
-    property var cpuHistory: []
-    property var memoryHistory: []
+    property var cpuInfoData: ({})
     property var networkHistory: []
     property var batteryHistory: []
-    property real previousNetworkRx: 0
-    property real previousNetworkTx: 0
-    property real previousNetworkStamp: 0
-    property real networkRxRate: 0
-    property real networkTxRate: 0
+    property var _systemStatsConsumerService: null
+    property var _networkConsumerService: null
+    readonly property var mediaData: mediaService ? ({
+        "available": mediaService.hasPlayer ? "1" : "0",
+        "player": mediaService.playerName,
+        "status": mediaService.status,
+        "title": mediaService.title,
+        "artist": mediaService.artist,
+        "album": mediaService.album,
+        "art": mediaService.artUrl,
+        "length": mediaService.length * 1000000,
+        "position": mediaService.position
+    }) : ({})
+    readonly property var cpuData: ({
+        "usage": systemStatsService ? systemStatsService.cpuUsage : 0,
+        "cores": numberValue(cpuInfoData, "cores", 0),
+        "load": String(cpuInfoData.load || "")
+    })
+    readonly property var memoryData: ({
+        "mem_total": systemStatsService ? systemStatsService.memoryTotalBytes / 1024 : 0,
+        "mem_available": systemStatsService ? systemStatsService.memoryAvailableBytes / 1024 : 0,
+        "mem_used": systemStatsService ? systemStatsService.memoryUsedBytes / 1024 : 0,
+        "mem_percent": systemStatsService ? systemStatsService.memoryUsedPercent : 0
+    })
+    readonly property var networkData: ({
+        "online": networkService && networkService.online ? "1" : "0",
+        "device": networkService ? networkService.device : "",
+        "state": networkService && networkService.online ? "up" : "offline",
+        "rx": networkService ? networkService.rxBytes : 0,
+        "tx": networkService ? networkService.txBytes : 0
+    })
+    readonly property var batteryData: ({
+        "present": batteryService && batteryService.available ? "1" : "0",
+        "status": batteryService ? batteryService.stateName : "",
+        "capacity": batteryService ? batteryService.percent : 0
+    })
+    readonly property var cpuHistory: systemStatsService ? systemStatsService.cpuHistory : []
+    readonly property var memoryHistory: systemStatsService ? systemStatsService.memoryHistory : []
+    readonly property real networkRxRate: networkService ? networkService.rxRate : 0
+    readonly property real networkTxRate: networkService ? networkService.txRate : 0
     property real triggerX: anchoredX()
     property real triggerY: 0
     property real triggerScale: 0.18
@@ -37,8 +70,23 @@ PopupWindow {
 
     signal processesRequested(var anchorItem)
 
-    function shellQuote(value) {
-        return "'" + String(value || "").replace(/'/g, "'\\''") + "'";
+    onPanelOpenChanged: {
+        syncServiceConsumers();
+        if (panelOpen) {
+            rememberNetworkSample();
+            rememberBatterySample();
+        }
+    }
+    onSettingsChanged: syncServiceConsumers()
+    onSystemStatsServiceChanged: syncServiceConsumers()
+    onNetworkServiceChanged: {
+        syncServiceConsumers();
+        if (panelOpen)
+            rememberNetworkSample();
+    }
+    onBatteryServiceChanged: {
+        if (panelOpen)
+            rememberBatterySample();
     }
 
     function clampedX(value) {
@@ -80,8 +128,8 @@ PopupWindow {
         updateTrigger(anchor);
         selectedModule = "";
         panelClosing = false;
-        refreshAll();
         panelOpen = true;
+        refreshAll();
     }
 
     function openModule(name, anchor) {
@@ -89,8 +137,8 @@ PopupWindow {
         updateTrigger(anchor);
         selectedModule = String(name || "");
         panelClosing = false;
-        refreshAll();
         panelOpen = true;
+        refreshAll();
     }
 
     function close() {
@@ -120,6 +168,46 @@ PopupWindow {
 
     function performanceModules() {
         return configuredList(settings ? settings.dashboardPerformanceModules : [], ["cpu", "memory", "network", "battery"]);
+    }
+
+    function usesPerformanceModule(name) {
+        return performanceModules().indexOf(name) >= 0;
+    }
+
+    function syncServiceConsumers() {
+        const needsSystemStats = panelOpen && systemStatsService
+                && (usesPerformanceModule("cpu") || usesPerformanceModule("memory"));
+        if (_systemStatsConsumerService
+                && (_systemStatsConsumerService !== systemStatsService || !needsSystemStats)) {
+            _systemStatsConsumerService.removeConsumer();
+            _systemStatsConsumerService = null;
+        }
+        if (needsSystemStats && !_systemStatsConsumerService) {
+            systemStatsService.addConsumer();
+            _systemStatsConsumerService = systemStatsService;
+        }
+
+        const needsNetwork = panelOpen && networkService && usesPerformanceModule("network");
+        if (_networkConsumerService
+                && (_networkConsumerService !== networkService || !needsNetwork)) {
+            _networkConsumerService.removeConsumer();
+            _networkConsumerService = null;
+        }
+        if (needsNetwork && !_networkConsumerService) {
+            networkService.addConsumer();
+            _networkConsumerService = networkService;
+        }
+    }
+
+    function releaseServiceConsumers() {
+        if (_systemStatsConsumerService) {
+            _systemStatsConsumerService.removeConsumer();
+            _systemStatsConsumerService = null;
+        }
+        if (_networkConsumerService) {
+            _networkConsumerService.removeConsumer();
+            _networkConsumerService = null;
+        }
     }
 
     function parseKeyValues(text) {
@@ -175,11 +263,7 @@ PopupWindow {
 
     function refreshAll() {
         refreshQuickState();
-        refreshMedia();
-        refreshCpu();
-        refreshMemory();
-        refreshNetwork();
-        refreshBattery();
+        refreshCpuInfo();
     }
 
     function refreshQuickState() {
@@ -189,55 +273,22 @@ PopupWindow {
         quickStateProc.running = true;
     }
 
-    function refreshMedia() {
-        if (!settings || !settings.dashboardShowMedia || mediaProc.running) return;
-
-        mediaProc.command = ["sh", "-c", "if ! command -v playerctl >/dev/null 2>&1; then printf 'available=0\\n'; exit 0; fi; if ! playerctl status >/dev/null 2>&1; then printf 'available=0\\n'; exit 0; fi; playerctl metadata --format 'available=1\\nplayer={{playerName}}\\nstatus={{status}}\\ntitle={{title}}\\nartist={{artist}}\\nalbum={{album}}\\nart={{mpris:artUrl}}\\nlength={{mpris:length}}' 2>/dev/null || printf 'available=0\\n'; printf 'position=%s\\n' \"$(playerctl position 2>/dev/null || echo 0)\""];
-        mediaProc.running = true;
+    function refreshCpuInfo() {
+        if (!panelOpen || !usesPerformanceModule("cpu")
+                || (settings && settings.performanceMode) || cpuInfoProc.running)
+            return;
+        cpuInfoProc.running = true;
     }
 
-    function refreshCpu() {
-        if (cpuProc.running) return;
-        cpuProc.command = ["sh", "-c", "read _ u n s i io irq sirq st rest < /proc/stat; total=$((u+n+s+i+io+irq+sirq+st)); idle=$((i+io)); sleep 0.12; read _ u2 n2 s2 i2 io2 irq2 sirq2 st2 rest < /proc/stat; total2=$((u2+n2+s2+i2+io2+irq2+sirq2+st2)); idle2=$((i2+io2)); dt=$((total2-total)); di=$((idle2-idle)); usage=0; [ \"$dt\" -gt 0 ] && usage=$((100*(dt-di)/dt)); read l1 l2 l3 rest < /proc/loadavg; printf 'usage=%s\\ncores=%s\\nload=%s %s %s\\n' \"$usage\" \"$(nproc)\" \"$l1\" \"$l2\" \"$l3\""];
-        cpuProc.running = true;
-    }
-
-    function refreshMemory() {
-        if (memoryProc.running) return;
-        memoryProc.command = ["sh", "-c", "mt=$(awk '/MemTotal:/ {print $2}' /proc/meminfo); ma=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo); mu=$((mt-ma)); mp=0; [ \"$mt\" -gt 0 ] && mp=$((100*mu/mt)); printf 'mem_total=%s\\nmem_available=%s\\nmem_used=%s\\nmem_percent=%s\\n' \"$mt\" \"$ma\" \"$mu\" \"$mp\""];
-        memoryProc.running = true;
-    }
-
-    function refreshNetwork() {
-        if (networkProc.running) return;
-
-        const requested = String(settings ? settings.networkInterfaceName : "").trim();
-        const prefix = requested.length > 0 ? "dev=" + shellQuote(requested) : "dev=$(ip -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \\([^ ]*\\).*/\\1/p' | head -1)";
-        networkProc.command = ["sh", "-c", prefix + "; if [ -z \"$dev\" ] || [ ! -d \"/sys/class/net/$dev\" ]; then printf 'online=0\\n'; exit 0; fi; rx=$(cat \"/sys/class/net/$dev/statistics/rx_bytes\" 2>/dev/null || echo 0); tx=$(cat \"/sys/class/net/$dev/statistics/tx_bytes\" 2>/dev/null || echo 0); state=$(cat \"/sys/class/net/$dev/operstate\" 2>/dev/null || echo unknown); printf 'online=1\\ndevice=%s\\nstate=%s\\nrx=%s\\ntx=%s\\n' \"$dev\" \"$state\" \"$rx\" \"$tx\""];
-        networkProc.running = true;
-    }
-
-    function refreshBattery() {
-        if (batteryProc.running) return;
-        batteryProc.command = ["sh", "-c", "bat=$(find /sys/class/power_supply -maxdepth 1 -name 'BAT*' | head -1); if [ -z \"$bat\" ]; then printf 'present=0\\n'; exit 0; fi; printf 'present=1\\n'; for f in status capacity power_now energy_now energy_full cycle_count; do [ -r \"$bat/$f\" ] && printf '%s=%s\\n' \"$f\" \"$(cat \"$bat/$f\")\"; done"];
-        batteryProc.running = true;
-    }
-
-    function updateNetwork(data) {
-        const rx = Number(data.rx) || 0;
-        const tx = Number(data.tx) || 0;
-        const now = Date.now();
-        if (previousNetworkStamp > 0 && now > previousNetworkStamp && rx >= previousNetworkRx && tx >= previousNetworkTx) {
-            const seconds = Math.max(0.001, (now - previousNetworkStamp) / 1000);
-            networkRxRate = (rx - previousNetworkRx) / seconds;
-            networkTxRate = (tx - previousNetworkTx) / seconds;
-        }
-        previousNetworkRx = rx;
-        previousNetworkTx = tx;
-        previousNetworkStamp = now;
-        networkData = data;
+    function rememberNetworkSample() {
+        if (!panelOpen || !usesPerformanceModule("network")) return;
         const scale = Math.max(1024, (Number(settings ? settings.modulePopupNetworkScaleKib : 0) || 10240) * 1024);
         networkHistory = rememberHistory(networkHistory, Math.min(1, (networkRxRate + networkTxRate) / scale));
+    }
+
+    function rememberBatterySample() {
+        if (!panelOpen || !usesPerformanceModule("battery") || !batteryService) return;
+        batteryHistory = rememberHistory(batteryHistory, batteryService.percent / 100);
     }
 
     function mediaProgress() {
@@ -271,15 +322,15 @@ PopupWindow {
     }
 
     function mediaAction(action) {
-        if (!boolValue(mediaData, "available")) return;
-        runAction("playerctl " + action + " >/dev/null 2>&1 || true", "media");
+        if (!mediaService || !mediaService.hasPlayer) return;
+        if (action === "previous") mediaService.previous();
+        else if (action === "play-pause") mediaService.togglePlaying();
+        else if (action === "next") mediaService.next();
     }
 
     function seekMedia(ratio) {
-        const length = numberValue(mediaData, "length", 0);
-        if (!boolValue(mediaData, "available") || length <= 0) return;
-        const seconds = Math.max(0, Math.min(length / 1000000, ratio * length / 1000000));
-        runAction("playerctl position " + Math.round(seconds * 1000) / 1000 + " >/dev/null 2>&1 || true", "media");
+        if (!mediaService || !mediaService.hasPlayer || mediaService.length <= 0) return;
+        mediaService.setPosition(Math.max(0, Math.min(mediaService.length, ratio * mediaService.length)));
     }
 
     anchor.window: panelWindow
@@ -289,7 +340,7 @@ PopupWindow {
     implicitHeight: dashboardFrame.height
     visible: panelOpen || panelClosing
     grabFocus: panelOpen
-    color: "transparent"
+    color: theme.transparent
 
     Shortcut {
         sequences: [StandardKey.Cancel]
@@ -307,11 +358,13 @@ PopupWindow {
     }
 
     Timer { interval: settings ? settings.dashboardStatePollMs : 5000; running: root.panelOpen; repeat: true; onTriggered: root.refreshQuickState() }
-    Timer { interval: settings ? settings.dashboardMediaPollMs : 500; running: root.panelOpen && settings.dashboardShowMedia; repeat: true; onTriggered: root.refreshMedia() }
-    Timer { interval: settings ? settings.cpuPollMs : 30000; running: root.panelOpen; repeat: true; onTriggered: root.refreshCpu() }
-    Timer { interval: settings ? settings.memoryPollMs : 5000; running: root.panelOpen; repeat: true; onTriggered: root.refreshMemory() }
-    Timer { interval: settings ? settings.networkPollMs : 5000; running: root.panelOpen; repeat: true; onTriggered: root.refreshNetwork() }
-    Timer { interval: settings ? settings.batteryFallbackPollMs : 30000; running: root.panelOpen; repeat: true; onTriggered: root.refreshBattery() }
+    Timer {
+        interval: settings ? settings.cpuPollMs : 0
+        running: root.panelOpen && root.settings && !root.settings.performanceMode
+                 && root.usesPerformanceModule("cpu") && interval > 0
+        repeat: true
+        onTriggered: root.refreshCpuInfo()
+    }
 
     Process {
         id: quickStateProc
@@ -320,49 +373,10 @@ PopupWindow {
     }
 
     Process {
-        id: mediaProc
-        stdout: StdioCollector { onStreamFinished: root.mediaData = root.parseKeyValues(text) }
-        stderr: StdioCollector {}
-    }
-
-    Process {
-        id: cpuProc
+        id: cpuInfoProc
+        command: ["sh", "-c", "read l1 l2 l3 rest < /proc/loadavg; printf 'cores=%s\\nload=%s %s %s\\n' \"$(nproc)\" \"$l1\" \"$l2\" \"$l3\""]
         stdout: StdioCollector {
-            onStreamFinished: {
-                const data = root.parseKeyValues(text);
-                root.cpuData = data;
-                root.cpuHistory = root.rememberHistory(root.cpuHistory, root.numberValue(data, "usage", 0) / 100);
-            }
-        }
-        stderr: StdioCollector {}
-    }
-
-    Process {
-        id: memoryProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const data = root.parseKeyValues(text);
-                root.memoryData = data;
-                root.memoryHistory = root.rememberHistory(root.memoryHistory, root.numberValue(data, "mem_percent", 0) / 100);
-            }
-        }
-        stderr: StdioCollector {}
-    }
-
-    Process {
-        id: networkProc
-        stdout: StdioCollector { onStreamFinished: root.updateNetwork(root.parseKeyValues(text)) }
-        stderr: StdioCollector {}
-    }
-
-    Process {
-        id: batteryProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const data = root.parseKeyValues(text);
-                root.batteryData = data;
-                root.batteryHistory = root.rememberHistory(root.batteryHistory, root.numberValue(data, "capacity", 0) / 100);
-            }
+            onStreamFinished: root.cpuInfoData = root.parseKeyValues(text)
         }
         stderr: StdioCollector {}
     }
@@ -375,11 +389,36 @@ PopupWindow {
         stdout: StdioCollector {}
         stderr: StdioCollector {}
         onExited: {
-            if (refreshTarget === "media") root.refreshMedia();
-            else if (refreshTarget === "quick") root.refreshQuickState();
+            if (refreshTarget === "quick") root.refreshQuickState();
             refreshTarget = "";
         }
     }
+
+    Connections {
+        target: root.networkService
+
+        function onThroughputSampled() {
+            root.rememberNetworkSample();
+        }
+    }
+
+    Connections {
+        target: root.batteryService
+
+        function onPercentChanged() {
+            root.rememberBatterySample();
+        }
+    }
+
+    Connections {
+        target: root.settings
+
+        function onDashboardPerformanceModulesChanged() {
+            root.syncServiceConsumers();
+        }
+    }
+
+    Component.onDestruction: releaseServiceConsumers()
 
     MouseArea {
         anchors.fill: parent

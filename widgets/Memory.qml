@@ -1,72 +1,55 @@
 import QtQuick
-import Quickshell.Io
 
 Pill {
     id: root
 
-    property real usedPercent: 0
-    property var usageHistory: []
+    property var systemStatsService
+    property var _consumerService: null
+    readonly property bool graphEnabled: moduleSettings.showGraph === undefined
+                                                  ? settings.memoryShowGraph
+                                                  : Boolean(moduleSettings.showGraph)
+    readonly property real usedPercent: systemStatsService
+                                                ? Number(systemStatsService.memoryUsedPercent) || 0
+                                                : 0
+    readonly property var usageHistory: systemStatsService
+                                            ? Array.from(systemStatsService.memoryHistory || []).slice(-12)
+                                            : []
 
     icon: ""
-    text: settings.memoryShowGraph ? "" : Math.round(usedPercent) + "%"
+    text: graphEnabled ? "" : Math.round(usedPercent) + "%"
     detailText: settings.widgetStyle === "expanded" ? Math.round(usedPercent) + "% used" : ""
     active: usedPercent >= 75
     urgent: usedPercent >= 90
-    progress: settings.memoryShowGraph ? -1 : usedPercent / 100
+    progress: graphEnabled ? -1 : usedPercent / 100
     progressColor: theme.alpha(graphColor, 0.16)
-    textPulseOnChange: !settings.memoryShowGraph
-    maximumTextWidth: settings.memoryShowGraph ? 96 : 52
-    showGraph: settings.memoryShowGraph
+    textPulseOnChange: !graphEnabled
+    maximumTextWidth: graphEnabled ? theme.moduleGraphWidth : theme.moduleValueWidth
+    showGraph: graphEnabled
     graphValues: usageHistory
     graphColor: urgent ? theme.urgent : active ? theme.warning : theme.accent
     detailsOnClick: true
-    detailsModuleName: "memory"
+    detailsModuleName: moduleInstanceId || "memory"
 
-    function refresh() {
-        meminfoFile.reload();
+    function registerConsumer() {
+        if (_consumerService || !systemStatsService)
+            return;
+        _consumerService = systemStatsService;
+        _consumerService.addConsumer();
     }
 
-    function rememberUsage(value) {
-        const next = Array.from(usageHistory || []);
-        next.push(Math.max(0, Math.min(1, value / 100)));
-
-        while (next.length > 12) next.shift();
-        usageHistory = next;
+    function unregisterConsumer() {
+        if (!_consumerService)
+            return;
+        _consumerService.removeConsumer();
+        _consumerService = null;
     }
 
-    function updateFromMeminfo(meminfo) {
-        const lines = String(meminfo || "").split("\n");
-        let total = 0;
-        let available = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            const parts = lines[i].split(/\s+/);
-            if (parts[0] === "MemTotal:") total = Number(parts[1]);
-            if (parts[0] === "MemAvailable:") available = Number(parts[1]);
-        }
-
-        if (total > 0 && available > 0) {
-            usedPercent = Math.max(0, Math.min(100, (1 - available / total) * 100));
-            rememberUsage(usedPercent);
+    onSystemStatsServiceChanged: {
+        if (_consumerService !== systemStatsService) {
+            unregisterConsumer();
+            registerConsumer();
         }
     }
-
-    FileView {
-        id: meminfoFile
-
-        path: "/proc/meminfo"
-        watchChanges: false
-        blockLoading: true
-        printErrors: false
-        onLoaded: root.updateFromMeminfo(text())
-    }
-
-    Timer {
-        interval: settings.memoryPollMs
-        running: root.visible && settings.memoryPollMs > 0
-        repeat: true
-        onTriggered: root.refresh()
-    }
-
-    Component.onCompleted: root.refresh()
+    Component.onCompleted: registerConsumer()
+    Component.onDestruction: unregisterConsumer()
 }

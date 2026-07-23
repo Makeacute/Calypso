@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "leftModules": [
+    "ram",
+    "memory",
+    "controls"
+  ],
+  "centerModules": [
+    "time",
+    "clock"
+  ],
+  "rightModules": [
+    "volume",
+    "audio",
+    "mpris",
+    "player"
+  ],
+  "moduleVisibility": {
+    "ram": false,
+    "memory": true,
+    "controls": false,
+    "dashboard": true,
+    "time": false,
+    "volume": false,
+    "media": true
+  },
+  "memoryShowGraph": true,
+  "audioShowPercentage": false,
+  "mediaMaxWidth": 240,
+  "dashboardPerformanceModules": [
+    "ram",
+    "net",
+    "bat"
+  ],
+  "moduleRegistry": [
+    {
+      "id": "ram",
+      "label": "Runtime metadata must be discarded"
+    }
+  ],
+  "availableModules": [
+    "ram",
+    "controls"
+  ],
+  "themeRecipes": [
+    {
+      "id": "runtime-recipe"
+    }
+  ],
+  "futureSetting": {
+    "enabled": true
+  }
+}

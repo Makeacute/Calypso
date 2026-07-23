@@ -45,7 +45,7 @@ PopupWindow {
     implicitWidth: panelWindow ? panelWindow.width : tooltipSurface.width
     implicitHeight: tooltipSurface.height
     visible: open || tooltipSurface.opacity > 0
-    color: "transparent"
+    color: theme.transparent
 
     Rectangle {
         id: tooltipSurface

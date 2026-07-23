@@ -7,5 +7,8 @@ result-*
 perf-reports/
 .qmlls.ini
 *.bak
+settings.v3.*.json
+__pycache__/
+*.pyc
 .agents/
 .codex/

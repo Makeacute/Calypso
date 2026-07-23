@@ -5,7 +5,12 @@ Item {
 
     property var theme
     property var settings
+    property string moduleInstanceId: ""
+    property var moduleSettings: ({})
     property var compositor
+    readonly property string displayMode: moduleSettings.displayMode === undefined ? settings.focusedWindowDisplayMode : String(moduleSettings.displayMode)
+    readonly property int maximumTitleWidth: moduleSettings.maxWidth === undefined ? settings.focusedWindowMaxWidth : Number(moduleSettings.maxWidth)
+    readonly property bool showFocusedTitle: moduleSettings.showTitle === undefined ? settings.focusedWindowShowTitle : Boolean(moduleSettings.showTitle)
     property var workspaces: compositor ? compositor.workspaces : []
     property var windows: compositor ? compositor.windows : []
     property var focusedWindow: compositor ? compositor.focusedWindow : ({})
@@ -41,7 +46,7 @@ Item {
                                    .filter(window => Number(window.workspaceId) === workspaceId)
                                    .sort(compareWindows);
 
-        if (settings.focusedWindowDisplayMode === "focusedTitle" && focusedWindow && focusedWindow.id !== undefined) {
+        if (displayMode === "focusedTitle" && focusedWindow && focusedWindow.id !== undefined) {
             return [focusedWindow];
         }
 
@@ -91,7 +96,7 @@ Item {
 
                 property var windowData: root.workspaceWindows[index]
                 property bool focused: windowData && Number(windowData.id) === Number(root.focusedWindow.id)
-                property bool showTitle: settings.focusedWindowDisplayMode === "focusedTitle" || (focused && settings.focusedWindowShowTitle && settings.focusedWindowDisplayMode !== "iconsOnly")
+                property bool showTitle: root.displayMode === "focusedTitle" || (focused && root.showFocusedTitle && root.displayMode !== "iconsOnly")
 
                 width: Math.max(settings.moduleHeight,
                                 appContent.implicitWidth + settings.effectivePillPadding * 2)
@@ -153,7 +158,7 @@ Item {
                         font.weight: Font.Medium
                         elide: Text.ElideRight
                         maximumLineCount: 1
-                        width: Math.min(implicitWidth, settings.focusedWindowMaxWidth)
+                        width: Math.min(implicitWidth, root.maximumTitleWidth)
                         verticalAlignment: Text.AlignVCenter
 
                         Behavior on color {

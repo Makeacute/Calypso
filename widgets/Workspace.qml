@@ -5,7 +5,17 @@ Item {
 
     property var theme
     property var settings
+    property string moduleInstanceId: ""
+    property var moduleSettings: ({})
     property var compositor
+    readonly property string indicatorStyle: moduleSettings.indicatorStyle === undefined ? settings.workspaceIndicatorStyle : String(moduleSettings.indicatorStyle)
+    readonly property int maxAppIcons: moduleSettings.maxAppIcons === undefined ? settings.workspaceMaxAppIcons : Number(moduleSettings.maxAppIcons)
+    readonly property int minimumWidth: moduleSettings.minWidth === undefined ? settings.workspaceMinWidth : Number(moduleSettings.minWidth)
+    readonly property bool scrollEnabled: moduleSettings.scrollEnabled === undefined ? settings.workspaceScrollEnabled : Boolean(moduleSettings.scrollEnabled)
+    readonly property bool scrollWrap: moduleSettings.scrollWrap === undefined ? settings.workspaceScrollWrap : Boolean(moduleSettings.scrollWrap)
+    readonly property bool showAppIcons: moduleSettings.showAppIcons === undefined ? settings.workspaceShowAppIcons : Boolean(moduleSettings.showAppIcons)
+    readonly property bool showNumbers: moduleSettings.showNumbers === undefined ? settings.workspaceShowNumbers : Boolean(moduleSettings.showNumbers)
+    readonly property bool showOccupied: moduleSettings.showOccupied === undefined ? settings.workspaceShowOccupied : Boolean(moduleSettings.showOccupied)
     property var workspaces: compositor ? compositor.workspaces : []
     property var windows: compositor ? compositor.windows : []
     property int openedWindowWorkspaceId: compositor ? compositor.openedWindowWorkspaceId : -1
@@ -60,7 +70,7 @@ Item {
     }
 
     function label(workspace) {
-        if (!settings.workspaceShowNumbers && !workspace.name)
+        if (!showNumbers && !workspace.name)
             return "";
         return workspace.label || String(workspace.index);
     }
@@ -73,10 +83,10 @@ Item {
     }
 
     function workspaceAppIcons(workspace) {
-        if (!settings.workspaceShowAppIcons || !workspace) return [];
+        if (!showAppIcons || !workspace) return [];
 
         const workspaceId = Number(workspace.id);
-        const maxIcons = Math.max(1, Number(settings.workspaceMaxAppIcons) || 4);
+        const maxIcons = Math.max(1, Number(root.maxAppIcons) || 4);
         const list = Array.from(windows || [])
                           .filter(window => Number(window.workspaceId) === workspaceId)
                           .sort(compareWindows);
@@ -132,7 +142,7 @@ Item {
 
         let nextIndex = focusedIndex >= 0 ? focusedIndex + offset : (offset > 0 ? 0 : list.length - 1);
 
-        if (settings.workspaceScrollWrap) {
+        if (scrollWrap) {
             nextIndex = (nextIndex + list.length) % list.length;
         } else {
             nextIndex = Math.max(0, Math.min(list.length - 1, nextIndex));
@@ -145,7 +155,7 @@ Item {
     }
 
     function handleWheel(wheel) {
-        if (!settings.workspaceScrollEnabled)
+        if (!scrollEnabled)
             return;
 
         const angle = wheel.angleDelta ? wheel.angleDelta.y : 0;
@@ -174,7 +184,7 @@ Item {
         const item = focusedItem();
         const id = focusedWorkspaceIdValue;
         const focusChanged = indicatorWorkspaceId >= 0 && id >= 0 && id !== indicatorWorkspaceId;
-        const style = settings.workspaceIndicatorStyle;
+        const style = indicatorStyle;
         const compactWidth = style === "dot" ? Math.max(4, settings.effectiveContentSpacing)
                                              : style === "underline" ? Math.max(settings.moduleHeight * 0.62, settings.effectiveIconSize)
                                                                       : 0;
@@ -236,12 +246,12 @@ Item {
         id: focusIndicator
 
         x: root.indicatorX
-        y: settings.workspaceIndicatorStyle === "underline" ? settings.moduleHeight - Math.max(2, settings.effectiveContentSpacing / 2)
-                                                            : settings.workspaceIndicatorStyle === "dot" ? settings.moduleHeight - Math.max(4, settings.effectiveContentSpacing)
+        y: root.indicatorStyle === "underline" ? settings.moduleHeight - Math.max(2, settings.effectiveContentSpacing / 2)
+                                               : root.indicatorStyle === "dot" ? settings.moduleHeight - Math.max(4, settings.effectiveContentSpacing)
                                                                                                          : 0
         width: root.indicatorWidth
-        height: settings.workspaceIndicatorStyle === "pill" ? settings.moduleHeight
-                                                            : settings.workspaceIndicatorStyle === "dot" ? Math.max(4, settings.effectiveContentSpacing)
+        height: root.indicatorStyle === "pill" ? settings.moduleHeight
+                                               : root.indicatorStyle === "dot" ? Math.max(4, settings.effectiveContentSpacing)
                                                                                                         : Math.max(2, settings.effectiveContentSpacing / 2)
         visible: root.indicatorVisible
         radius: height / 2
@@ -290,7 +300,7 @@ Item {
             height: parent.height / 2
             radius: parent.radius
             color: theme.gloss
-            visible: settings.workspaceIndicatorStyle === "pill"
+            visible: root.indicatorStyle === "pill"
             antialiasing: true
         }
     }
@@ -317,7 +327,7 @@ Item {
                 property int windowCount: root.workspaceWindowCount(workspaceData)
                 property bool occupied: windowCount > 0
                 property var appIcons: root.workspaceAppIcons(workspaceData)
-                property bool showIcons: settings.workspaceShowAppIcons && appIcons.length > 0
+                property bool showIcons: root.showAppIcons && appIcons.length > 0
                 property bool showLabel: root.label(workspaceData).length > 0 && settings.widgetStyle !== "iconOnly"
                 property bool pulsing: pulseAnimation.running
                 property real pulseScale: 1
@@ -327,7 +337,7 @@ Item {
                     pulseAnimation.restart();
                 }
 
-                width: Math.max(settings.workspaceMinWidth,
+                width: Math.max(root.minimumWidth,
                                 workspaceContent.implicitWidth > 0 ? workspaceContent.implicitWidth + settings.effectivePillPadding * 2 : settings.moduleHeight)
                 height: settings.moduleHeight
                 radius: settings.effectivePillRadius
@@ -443,7 +453,7 @@ Item {
                     height: Math.max(1, settings.effectiveContentSpacing / 2)
                     radius: height / 2
                     color: workspacePill.focused ? theme.accent : workspacePill.active ? theme.text : theme.textMuted
-                    opacity: settings.workspaceShowOccupied && workspacePill.occupied ? (workspacePill.focused ? 0.95 : 0.68) : 0
+                    opacity: root.showOccupied && workspacePill.occupied ? (workspacePill.focused ? 0.95 : 0.68) : 0
                     scale: workspacePill.occupied ? (workspacePill.pulsing ? 1.16 : 1) : 0
                     antialiasing: true
 

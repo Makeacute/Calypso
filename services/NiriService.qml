@@ -59,7 +59,28 @@ Item {
     }
 
     function trackWindowTitles() {
-        return settings && settings.focusedWindowShowTitle;
+        if (!settings)
+            return false;
+
+        const placements = Array.from(settings.leftModules || [])
+            .concat(Array.from(settings.centerModules || []))
+            .concat(Array.from(settings.rightModules || []));
+        for (let i = 0; i < placements.length; i++) {
+            const instanceId = String(placements[i] || "");
+            if (settings.moduleId(instanceId) !== "focusedWindow" || !settings.enabled(instanceId))
+                continue;
+
+            const instance = settings.instanceSettings(instanceId) || {};
+            const displayMode = instance.displayMode === undefined
+                    ? String(settings.focusedWindowDisplayMode)
+                    : String(instance.displayMode);
+            const showTitle = instance.showTitle === undefined
+                    ? Boolean(settings.focusedWindowShowTitle)
+                    : Boolean(instance.showTitle);
+            if (displayMode === "focusedTitle" || showTitle)
+                return true;
+        }
+        return false;
     }
 
     function sameLayout(left, right) {

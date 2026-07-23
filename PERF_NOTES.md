@@ -19,9 +19,9 @@ Checked on 2026-07-17 after final integration and the Calypso visual/settings pa
 
 ## Timer Audit
 
-- `Settings.qml` `saveTimer`: necessary one-shot debounce for JSON writes after settings changes. `80ms` is intentionally short and not active while idle.
+- `SettingsStore.qml` `saveTimer`: necessary one-shot debounce for atomic JSON writes after settings changes. `80ms` is intentionally short and not active while idle.
 - `services/NiriService.qml` `restartTimer`: necessary one-shot stream restart backoff after the Niri event stream exits. `1500ms` is reasonable and event-replaceable only if Quickshell/Niri exposes a better reconnect primitive.
-- `widgets/Cpu.qml`: necessary polling because `/proc/stat` has no event stream. `cpuMs` default is `2500ms`, reasonable for a bar metric.
+- `services/SystemStatsService.qml`: shared CPU/memory sampling because `/proc` has no event stream. The configurable `cpuMs` default is `30000ms`; the shared sampler uses the shorter active CPU/memory interval.
 - `widgets/Memory.qml`: necessary polling because `/proc/meminfo` has no event stream. `memoryMs` default is `5000ms`, reasonable.
 - `widgets/Network.qml`: route/device status is polled through `ip -j route get 1.1.1.1`. `networkMs` default is `5000ms`, acceptable but event replacement through NetworkManager or netlink would be cleaner if this grows.
 - `widgets/Battery.qml`: UPower is event-backed when available. The `batteryFallbackMs` timer only runs without UPower and defaults to `30000ms`, reasonable.

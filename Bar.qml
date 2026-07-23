@@ -1,10 +1,9 @@
 pragma ComponentBehavior: Bound
 
 import Quickshell
-import Quickshell.Io
-import Quickshell.Services.Notifications
 import Quickshell.Wayland
 import QtQuick
+import "panels"
 import "services"
 import "widgets"
 
@@ -12,17 +11,16 @@ PanelWindow {
     id: bar
 
     required property var modelData
-    readonly property bool settingsOpen: settingsPanelLoader.item ? settingsPanelLoader.item.visible : false
+    required property var appContext
+    readonly property var settings: appContext.settings
+    readonly property var theme: appContext.theme
+    readonly property var compositor: appContext.compositor
+    readonly property var notificationServer: appContext.notificationServer
+    readonly property bool settingsOpen: appContext.settingsWindow
+                                         ? appContext.settingsWindow.visible
+                                         : false
     readonly property bool notificationsOpen: notificationPanelLoader.item ? notificationPanelLoader.item.visible : false
-    readonly property bool anyPanelOpen: panelIsOpen(settingsPanelLoader)
-                                      || panelIsOpen(clockPanelLoader)
-                                      || panelIsOpen(dashboardPanelLoader)
-                                      || panelIsOpen(moduleDetailsPanelLoader)
-                                      || panelIsOpen(notepadPanelLoader)
-                                      || panelIsOpen(clipboardPanelLoader)
-                                      || panelIsOpen(processPanelLoader)
-                                      || panelIsOpen(notificationPanelLoader)
-                                      || panelIsOpen(launcherPanelLoader)
+    readonly property bool anyPanelOpen: panelCoordinator.hasActivePanel
     readonly property var trackedNotifications: notificationServer.trackedNotifications ? notificationServer.trackedNotifications.values : []
     readonly property int notificationCount: trackedNotifications.length
     property bool backgroundPhaseReady: false
@@ -37,6 +35,58 @@ PanelWindow {
         return settings.barPosition === "bottom" ? offset : -offset;
     }
 
+    PanelCoordinator {
+        id: panelCoordinator
+    }
+
+    PanelAdapter {
+        panelId: "clock"
+        coordinator: panelCoordinator
+        panel: clockPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "dashboard"
+        coordinator: panelCoordinator
+        panel: dashboardPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "notepad"
+        coordinator: panelCoordinator
+        panel: notepadPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "clipboard"
+        coordinator: panelCoordinator
+        panel: clipboardPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "processes"
+        coordinator: panelCoordinator
+        panel: processPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "notifications"
+        coordinator: panelCoordinator
+        panel: notificationPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "launcher"
+        coordinator: panelCoordinator
+        panel: launcherPanelLoader.item
+    }
+
+    PanelAdapter {
+        panelId: "moduleDetails"
+        coordinator: panelCoordinator
+        panel: moduleDetailsPanelLoader.item
+    }
+
     function combinedModules() {
         return Array.from(settings.leftModules || [])
                     .concat(Array.from(settings.centerModules || []))
@@ -47,145 +97,141 @@ PanelWindow {
         interactionPhaseReady = true;
     }
 
-    function closeLoadedPanel(loader) {
-        const item = loader.item;
-        if (item && typeof item.close === "function")
-            item.close();
-    }
-
-    function panelIsOpen(loader) {
-        const item = loader.item;
-        return item && (item.panelOpen || item.visible);
-    }
-
     function closeAllPanels() {
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeToolPanels();
+        appContext.closeSettings();
+        panelCoordinator.closeAll();
     }
 
     function closeToolPanels() {
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        closeLoadedPanel(launcherPanelLoader);
+        panelCoordinator.close("notepad");
+        panelCoordinator.close("clipboard");
+        panelCoordinator.close("processes");
+        panelCoordinator.close("notifications");
+        panelCoordinator.close("launcher");
+    }
+
+    function closeNotifications() {
+        panelCoordinator.close("notifications");
+    }
+
+    function closeClock() {
+        panelCoordinator.close("clock");
+    }
+
+    function closeControls() {
+        panelCoordinator.close("dashboard");
+    }
+
+    function closeNotepad() {
+        panelCoordinator.close("notepad");
+    }
+
+    function closeClipboard() {
+        panelCoordinator.close("clipboard");
+    }
+
+    function closeProcessList() {
+        panelCoordinator.close("processes");
+    }
+
+    function closeLauncher() {
+        panelCoordinator.close("launcher");
+    }
+
+    function closeModuleDetails() {
+        panelCoordinator.close("moduleDetails");
+    }
+
+    function showOsd(kind, value) {
+        ensureInteractionPhase();
+        const type = String(kind || "volume");
+        const allowed = ["volume", "mute", "brightness", "keyboard", "capsLock", "numLock", "media", "battery"];
+        if (allowed.indexOf(type) < 0)
+            return;
+        const amount = Math.max(0, Math.min(1, Number(value) || 0.72));
+        const icon = type === "brightness" ? "󰃠"
+                   : type === "keyboard" ? "󰌌"
+                   : type === "capsLock" ? "󰘲"
+                   : type === "numLock" ? "󰎠"
+                   : type === "media" ? "󰝚"
+                   : type === "battery" ? "󰁹"
+                   : "󰕾";
+        if (osdLoader.item)
+            osdLoader.item.show(icon, amount, type, type.charAt(0).toUpperCase() + type.slice(1));
+    }
+
+    function showTooltip(text) {
+        ensureInteractionPhase();
+        if (tooltipHostLoader.item)
+            tooltipHostLoader.item.show(text, null);
+    }
+
+    function hideTooltip() {
+        if (tooltipHostLoader.item)
+            tooltipHostLoader.item.hide();
+    }
+
+    function openModuleTab(moduleName, tabName) {
+        ensureInteractionPhase();
+        panelCoordinator.open("moduleDetails", null, {
+            "moduleName": moduleName,
+            "tabName": tabName
+        });
     }
 
     function showSettings(anchorItem) {
+        appContext.rememberBar(bar);
         ensureInteractionPhase();
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeToolPanels();
-        if (settingsPanelLoader.item)
-            settingsPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.closeAll();
+        appContext.toggleSettings("overview", bar);
     }
 
     function showNotifications(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        closeLoadedPanel(launcherPanelLoader);
-        if (notificationPanelLoader.item)
-            notificationPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("notifications", anchorItem);
     }
 
     function showClock(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeToolPanels();
-        if (clockPanelLoader.item)
-            clockPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("clock", anchorItem);
     }
 
     function showControls(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeToolPanels();
-        if (dashboardPanelLoader.item)
-            dashboardPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("dashboard", anchorItem);
     }
 
     function showNotepad(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        closeLoadedPanel(launcherPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        if (notepadPanelLoader.item)
-            notepadPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("notepad", anchorItem);
     }
 
     function showClipboard(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        closeLoadedPanel(launcherPanelLoader);
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        if (clipboardPanelLoader.item)
-            clipboardPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("clipboard", anchorItem);
     }
 
     function showProcessList(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        closeLoadedPanel(launcherPanelLoader);
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        if (processPanelLoader.item)
-            processPanelLoader.item.toggle(anchorItem);
-        closeLoadedPanel(dashboardPanelLoader);
+        panelCoordinator.toggle("processes", anchorItem);
     }
 
     function showLauncher(anchorItem) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        if (launcherPanelLoader.item)
-            launcherPanelLoader.item.toggle(anchorItem);
+        panelCoordinator.toggle("launcher", anchorItem);
     }
 
     function showLauncherQuery(query) {
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeLoadedPanel(notepadPanelLoader);
-        closeLoadedPanel(clipboardPanelLoader);
-        closeLoadedPanel(processPanelLoader);
-        closeLoadedPanel(notificationPanelLoader);
-        if (launcherPanelLoader.item)
-            launcherPanelLoader.item.openQuery(query);
+        panelCoordinator.open("launcher", null, { "query": query });
     }
 
     function showModuleDetails(moduleName, anchorItem) {
@@ -207,23 +253,16 @@ PanelWindow {
             return;
         }
 
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeToolPanels();
-        if (moduleDetailsPanelLoader.item)
-            moduleDetailsPanelLoader.item.toggle(moduleName, anchorItem);
+        panelCoordinator.toggle("moduleDetails", anchorItem, { "moduleName": moduleName });
     }
 
     function openSettingsPage(page) {
+        appContext.rememberBar(bar);
         ensureInteractionPhase();
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeLoadedPanel(moduleDetailsPanelLoader);
-        closeToolPanels();
-        if (settingsPanelLoader.item)
-            settingsPanelLoader.item.openPage(page);
+        panelCoordinator.closeAll();
+        appContext.openSettings(page, bar);
     }
 
     function openModuleDetails(moduleName) {
@@ -245,217 +284,9 @@ PanelWindow {
             return;
         }
 
+        appContext.closeSettings();
         ensureInteractionPhase();
-        closeLoadedPanel(settingsPanelLoader);
-        closeLoadedPanel(clockPanelLoader);
-        closeLoadedPanel(dashboardPanelLoader);
-        closeToolPanels();
-        if (moduleDetailsPanelLoader.item)
-            moduleDetailsPanelLoader.item.open(moduleName, null);
-    }
-
-    IpcHandler {
-        target: "calypso"
-
-        function openSettings(): void {
-            bar.openSettingsPage("overview");
-        }
-
-        function closeSettings(): void {
-            bar.closeLoadedPanel(settingsPanelLoader);
-        }
-
-        function openNotifications(): void {
-            bar.showNotifications(null);
-        }
-
-        function closeNotifications(): void {
-            bar.closeLoadedPanel(notificationPanelLoader);
-        }
-
-        function openClock(): void {
-            bar.showClock(null);
-        }
-
-        function closeClock(): void {
-            bar.closeLoadedPanel(clockPanelLoader);
-        }
-
-        function openControls(): void {
-            bar.showControls(null);
-        }
-
-        function closeControls(): void {
-            bar.closeLoadedPanel(dashboardPanelLoader);
-        }
-
-        function openDashboard(): void {
-            bar.showControls(null);
-        }
-
-        function closeDashboard(): void {
-            bar.closeLoadedPanel(dashboardPanelLoader);
-        }
-
-        function openNotepad(): void {
-            bar.showNotepad(null);
-        }
-
-        function closeNotepad(): void {
-            bar.closeLoadedPanel(notepadPanelLoader);
-        }
-
-        function openClipboard(): void {
-            bar.showClipboard(null);
-        }
-
-        function closeClipboard(): void {
-            bar.closeLoadedPanel(clipboardPanelLoader);
-        }
-
-        function openProcesses(): void {
-            bar.showProcessList(null);
-        }
-
-        function closeProcesses(): void {
-            bar.closeLoadedPanel(processPanelLoader);
-        }
-
-        function openLauncher(): void {
-            bar.showLauncher(null);
-        }
-
-        function openLauncherQuery(query: string): void {
-            bar.showLauncherQuery(query);
-        }
-
-        function closeLauncher(): void {
-            bar.closeLoadedPanel(launcherPanelLoader);
-        }
-
-        function openSettingsPage(page: string): void {
-            bar.openSettingsPage(page);
-        }
-
-        function openSettingsDetail(moduleName: string): void {
-            bar.ensureInteractionPhase();
-            bar.closeLoadedPanel(clockPanelLoader);
-            bar.closeLoadedPanel(dashboardPanelLoader);
-            bar.closeLoadedPanel(moduleDetailsPanelLoader);
-            bar.closeToolPanels();
-            if (settingsPanelLoader.item)
-                settingsPanelLoader.item.openModuleOptions(moduleName);
-        }
-
-        function showOsd(kind: string, value: real): void {
-            bar.ensureInteractionPhase();
-            const type = String(kind || "volume");
-            const allowed = ["volume", "mute", "brightness", "keyboard", "capsLock", "numLock", "media", "battery"];
-            if (allowed.indexOf(type) < 0) return;
-            const amount = Math.max(0, Math.min(1, Number(value) || 0.72));
-            const icon = type === "brightness" ? "󰃠" : type === "keyboard" ? "󰌌" : type === "capsLock" ? "󰘲" : type === "numLock" ? "󰎠" : type === "media" ? "󰝚" : type === "battery" ? "󰁹" : "󰕾";
-            if (osdLoader.item)
-                osdLoader.item.show(icon, amount, type, type.charAt(0).toUpperCase() + type.slice(1));
-        }
-
-        function showTooltip(text: string): void {
-            bar.ensureInteractionPhase();
-            if (tooltipHostLoader.item)
-                tooltipHostLoader.item.show(text, null);
-        }
-
-        function hideTooltip(): void {
-            if (tooltipHostLoader.item)
-                tooltipHostLoader.item.hide();
-        }
-
-        function openModule(moduleName: string): void {
-            bar.openModuleDetails(moduleName);
-        }
-
-        function openModuleTab(moduleName: string, tabName: string): void {
-            bar.ensureInteractionPhase();
-            bar.closeLoadedPanel(settingsPanelLoader);
-            bar.closeLoadedPanel(clockPanelLoader);
-            bar.closeLoadedPanel(dashboardPanelLoader);
-            bar.closeToolPanels();
-            if (moduleDetailsPanelLoader.item)
-                moduleDetailsPanelLoader.item.openTab(moduleName, tabName, null);
-        }
-
-        function closeModule(): void {
-            bar.closeLoadedPanel(moduleDetailsPanelLoader);
-        }
-
-        function randomWallpaper(): void {
-            bar.ensureInteractionPhase();
-            if (settingsPanelLoader.item)
-                settingsPanelLoader.item.applyRandomWallpaper();
-        }
-
-        function previewWallpaper(path: string): void {
-            bar.ensureInteractionPhase();
-            if (settingsPanelLoader.item)
-                settingsPanelLoader.item.openWallpaperPreview(path);
-        }
-
-        function applyWallpaper(path: string): void {
-            bar.ensureInteractionPhase();
-            if (settingsPanelLoader.item)
-                settingsPanelLoader.item.applyWallpaperPath(path);
-        }
-
-        function setBarStyle(value: string): void {
-            settings.setEnum("barStyle", value, ["islands", "solid", "pill"], "islands");
-        }
-
-        function setBarPosition(value: string): void {
-            settings.setEnum("barPosition", value, ["top", "bottom"], "top");
-        }
-
-        function setWidgetStyle(value: string): void {
-            settings.setEnum("widgetStyle", value, ["iconOnly", "iconAndText", "expanded"], "iconAndText");
-        }
-
-        function setBarHeight(value: int): void {
-            settings.setNumber("barHeight", value, 24, 56);
-        }
-
-        function setSettingsWidth(value: int): void {
-            settings.setNumber("settingsPanelWidth", value, 640, 960);
-        }
-
-        function setSettingsDensity(value: string): void {
-            settings.setSettingsPanelDensity(value);
-        }
-
-        function setSettingsAnchor(value: string): void {
-            settings.setEnum("settingsPanelAnchor", value, ["button", "left", "center", "right"], "button");
-        }
-
-        function setThemeRecipe(value: string): void {
-            settings.setThemeRecipe(value);
-        }
-
-        function setSpacingScale(value: real): void {
-            settings.setReal("spacingScale", value, 0.5, 2.0, 0.1);
-        }
-
-        function setReduceMotion(value: bool): void {
-            settings.setReduceMotion(value);
-        }
-
-        function setModuleEnabled(moduleName: string, value: bool): void {
-            settings.setModuleEnabled(moduleName, value);
-        }
-
-        function setSectionModules(section: string, modulesCsv: string): void {
-            const modules = String(modulesCsv || "")
-                .split(",")
-                .map(item => item.trim())
-                .filter(item => item.length > 0);
-            settings.setSectionModules(section, modules);
-        }
+        panelCoordinator.open("moduleDetails", null, { "moduleName": moduleName });
     }
 
     function focusedWorkspaceData() {
@@ -485,42 +316,8 @@ PanelWindow {
         lastWorkspaceId = id;
     }
 
-    Settings {
-        id: settings
-    }
-
-    Theme {
-        id: theme
-
-        settings: settings
-    }
-
-    CompositorService {
-        id: compositor
-
-        settings: settings
-    }
-
-    NotificationServer {
-        id: notificationServer
-
-        keepOnReload: true
-        persistenceSupported: true
-        bodySupported: settings.notificationsShowBody
-        bodyMarkupSupported: false
-        bodyHyperlinksSupported: false
-        bodyImagesSupported: settings.notificationsShowImages
-        actionsSupported: settings.notificationsShowActions
-        actionIconsSupported: false
-        imageSupported: settings.notificationsShowImages
-
-        onNotification: function(notification) {
-            if (notification && !notification.transient)
-                notification.tracked = true;
-        }
-    }
-
     screen: modelData
+    visible: true
     anchors.top: settings.barPosition !== "bottom"
     anchors.bottom: settings.barPosition === "bottom"
     anchors.left: true
@@ -532,7 +329,7 @@ PanelWindow {
     implicitHeight: settings.barHeight
     exclusiveZone: bar.reservedEdgeSize
     aboveWindows: true
-    color: "transparent"
+    color: theme.transparent
 
     WlrLayershell.keyboardFocus: bar.anyPanelOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     onAnyPanelOpenChanged: if (bar.anyPanelOpen) escapeKeyHandler.forceActiveFocus()
@@ -609,9 +406,10 @@ PanelWindow {
             BarSection {
                 id: leftSection
 
-                theme: theme
-                settings: settings
-                compositor: compositor
+                theme: bar.theme
+                settings: bar.settings
+                appContext: bar.appContext
+                compositor: bar.compositor
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
@@ -637,9 +435,10 @@ PanelWindow {
             BarSection {
                 id: centerSection
 
-                theme: theme
-                settings: settings
-                compositor: compositor
+                theme: bar.theme
+                settings: bar.settings
+                appContext: bar.appContext
+                compositor: bar.compositor
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
@@ -666,9 +465,10 @@ PanelWindow {
             BarSection {
                 id: rightSection
 
-                theme: theme
-                settings: settings
-                compositor: compositor
+                theme: bar.theme
+                settings: bar.settings
+                appContext: bar.appContext
+                compositor: bar.compositor
                 panelWindow: bar
                 osd: osdLoader.item
                 tooltipHost: tooltipHostLoader.item
@@ -697,8 +497,8 @@ PanelWindow {
                 anchors.fill: parent
                 visible: settings.barStyle === "solid" || opacity > 0
                 opacity: settings.barStyle === "solid" ? 1 : 0
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 surfaceColor: theme.alpha(theme.surface, settings.barOpacity)
                 outlineColor: settings.barBorderEnabled ? theme.border : theme.transparent
                 outlineWidth: settings.barBorderEnabled ? settings.barBorderThickness : 0
@@ -717,9 +517,10 @@ PanelWindow {
                     ModuleStrip {
                         id: solidLeft
 
-                        theme: theme
-                        settings: settings
-                        compositor: compositor
+                        theme: bar.theme
+                        settings: bar.settings
+                        appContext: bar.appContext
+                        compositor: bar.compositor
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
@@ -742,9 +543,10 @@ PanelWindow {
                     ModuleStrip {
                         id: solidCenter
 
-                        theme: theme
-                        settings: settings
-                        compositor: compositor
+                        theme: bar.theme
+                        settings: bar.settings
+                        appContext: bar.appContext
+                        compositor: bar.compositor
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
@@ -767,9 +569,10 @@ PanelWindow {
                     ModuleStrip {
                         id: solidRight
 
-                        theme: theme
-                        settings: settings
-                        compositor: compositor
+                        theme: bar.theme
+                        settings: bar.settings
+                        appContext: bar.appContext
+                        compositor: bar.compositor
                         panelWindow: bar
                         osd: osdLoader.item
                         tooltipHost: tooltipHostLoader.item
@@ -800,8 +603,8 @@ PanelWindow {
                 height: settings.barHeight
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 surfaceColor: theme.alpha(theme.surface, settings.barOpacity)
                 outlineColor: settings.barBorderEnabled ? theme.border : theme.transparent
                 outlineWidth: settings.barBorderEnabled ? settings.barBorderThickness : 0
@@ -820,9 +623,10 @@ PanelWindow {
                 ModuleStrip {
                     id: pillStrip
 
-                    theme: theme
-                    settings: settings
-                    compositor: compositor
+                    theme: bar.theme
+                    settings: bar.settings
+                    appContext: bar.appContext
+                    compositor: bar.compositor
                     panelWindow: bar
                     osd: osdLoader.item
                     tooltipHost: tooltipHostLoader.item
@@ -849,27 +653,13 @@ PanelWindow {
     }
 
     Loader {
-        id: settingsPanelLoader
-
-        active: bar.interactionPhaseReady
-        sourceComponent: Component {
-            SettingsPanel {
-                theme: theme
-                settings: settings
-                panelWindow: bar
-                osd: osdLoader.item
-            }
-        }
-    }
-
-    Loader {
         id: clockPanelLoader
 
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             ClockPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -881,9 +671,13 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             DashboardPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
+                systemStatsService: bar.appContext.systemStatsService
+                networkService: bar.appContext.networkService
+                batteryService: bar.appContext.batteryService
+                mediaService: bar.appContext.mediaService
                 onProcessesRequested: function(anchorItem) { bar.showProcessList(anchorItem); }
             }
         }
@@ -895,8 +689,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             NotepadPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -908,8 +702,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             ClipboardPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -921,8 +715,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             ProcessPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -934,8 +728,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             NotificationPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
                 notifications: bar.trackedNotifications
             }
@@ -948,8 +742,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             LauncherPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -961,9 +755,14 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             ModuleDetailsPanel {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
+                systemStatsService: bar.appContext.systemStatsService
+                networkService: bar.appContext.networkService
+                batteryService: bar.appContext.batteryService
+                mediaService: bar.appContext.mediaService
+                powerProfileService: bar.appContext.powerProfileService
             }
         }
     }
@@ -974,8 +773,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             Osd {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -987,8 +786,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             WorkspaceToast {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -1000,8 +799,8 @@ PanelWindow {
         active: bar.interactionPhaseReady
         sourceComponent: Component {
             TooltipHost {
-                theme: theme
-                settings: settings
+                theme: bar.theme
+                settings: bar.settings
                 panelWindow: bar
             }
         }
@@ -1035,11 +834,48 @@ PanelWindow {
         startupComplete = true;
     }
 
+    component PanelAdapter: QtObject {
+        id: adapter
+
+        required property string panelId
+        required property var coordinator
+        property var panel
+        readonly property bool panelOpen: panel ? Boolean(panel.panelOpen || panel.visible) : false
+
+        function openFromCoordinator(anchorItem, payload) {
+            if (!panel)
+                return false;
+            const data = payload || {};
+            if (panelId === "moduleDetails") {
+                if (data.tabName)
+                    panel.openTab(String(data.moduleName || ""), String(data.tabName), anchorItem);
+                else
+                    panel.open(String(data.moduleName || ""), anchorItem);
+            } else if (panelId === "launcher" && data.query !== undefined) {
+                panel.openQuery(String(data.query));
+            } else {
+                panel.open(anchorItem);
+            }
+            return true;
+        }
+
+        function closeFromCoordinator() {
+            if (!panel || typeof panel.close !== "function")
+                return false;
+            panel.close();
+            return true;
+        }
+
+        Component.onCompleted: coordinator.register(panelId, adapter)
+        Component.onDestruction: coordinator.unregister(panelId, adapter)
+    }
+
     component ModuleStrip: Row {
         id: strip
 
         property var theme
         property var settings
+        property var appContext
         property var compositor
         property var panelWindow
         property var osd
@@ -1076,6 +912,7 @@ PanelWindow {
 
                 theme: strip.theme
                 settings: strip.settings
+                appContext: strip.appContext
                 compositor: strip.compositor
                 panelWindow: strip.panelWindow
                 osd: strip.osd

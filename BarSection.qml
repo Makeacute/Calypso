@@ -6,6 +6,7 @@ Surface {
     id: root
 
     property var compositor
+    property var appContext
     property var panelWindow
     property var osd
     property var tooltipHost
@@ -65,6 +66,7 @@ Surface {
 
                 theme: root.theme
                 settings: root.settings
+                appContext: root.appContext
                 compositor: root.compositor
                 panelWindow: root.panelWindow
                 osd: root.osd

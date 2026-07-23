@@ -1,79 +1,55 @@
 import QtQuick
-import Quickshell.Io
 
 Pill {
     id: root
 
-    property real usage: 0
-    property real previousTotal: 0
-    property real previousIdle: 0
-    property var usageHistory: []
+    property var systemStatsService
+    property var _consumerService: null
+    readonly property bool graphEnabled: moduleSettings.showGraph === undefined
+                                                  ? settings.cpuShowGraph
+                                                  : Boolean(moduleSettings.showGraph)
+    readonly property real usage: systemStatsService
+                                          ? Number(systemStatsService.cpuUsage) || 0
+                                          : 0
+    readonly property var usageHistory: systemStatsService
+                                            ? Array.from(systemStatsService.cpuHistory || []).slice(-12)
+                                            : []
 
     icon: ""
-    text: settings.cpuShowGraph ? "" : Math.round(usage) + "%"
+    text: graphEnabled ? "" : Math.round(usage) + "%"
     detailText: settings.widgetStyle === "expanded" ? Math.round(usage) + "% load" : ""
     active: usage >= 75
     urgent: usage >= 92
-    progress: settings.cpuShowGraph ? -1 : usage / 100
+    progress: graphEnabled ? -1 : usage / 100
     progressColor: theme.alpha(graphColor, 0.16)
-    textPulseOnChange: !settings.cpuShowGraph
-    maximumTextWidth: settings.cpuShowGraph ? 96 : 52
-    showGraph: settings.cpuShowGraph
+    textPulseOnChange: !graphEnabled
+    maximumTextWidth: graphEnabled ? theme.moduleGraphWidth : theme.moduleValueWidth
+    showGraph: graphEnabled
     graphValues: usageHistory
     graphColor: urgent ? theme.urgent : active ? theme.warning : theme.accent
     detailsOnClick: true
-    detailsModuleName: "cpu"
+    detailsModuleName: moduleInstanceId || "cpu"
 
-    function refresh() {
-        statFile.reload();
+    function registerConsumer() {
+        if (_consumerService || !systemStatsService)
+            return;
+        _consumerService = systemStatsService;
+        _consumerService.addConsumer();
     }
 
-    function rememberUsage(value) {
-        const next = Array.from(usageHistory || []);
-        next.push(Math.max(0, Math.min(1, value / 100)));
-
-        while (next.length > 12) next.shift();
-        usageHistory = next;
+    function unregisterConsumer() {
+        if (!_consumerService)
+            return;
+        _consumerService.removeConsumer();
+        _consumerService = null;
     }
 
-    function updateFromStat(statText) {
-        const firstLine = String(statText || "").split("\n")[0].trim();
-        const fields = firstLine.split(/\s+/).slice(1).map(Number);
-        if (fields.length < 5) return;
-
-        let total = 0;
-        for (let i = 0; i < fields.length; i++) total += fields[i];
-
-        const idle = fields[3] + (fields[4] || 0);
-        if (previousTotal > 0) {
-            const totalDelta = total - previousTotal;
-            const idleDelta = idle - previousIdle;
-            if (totalDelta > 0) {
-                usage = Math.max(0, Math.min(100, (1 - idleDelta / totalDelta) * 100));
-                rememberUsage(usage);
-            }
+    onSystemStatsServiceChanged: {
+        if (_consumerService !== systemStatsService) {
+            unregisterConsumer();
+            registerConsumer();
         }
-
-        previousTotal = total;
-        previousIdle = idle;
     }
-
-    FileView {
-        id: statFile
-
-        path: "/proc/stat"
-        watchChanges: false
-        blockLoading: true
-        printErrors: false
-        onLoaded: root.updateFromStat(text())
-    }
-
-    Timer {
-        interval: settings.cpuPollMs
-        running: root.visible && settings.cpuPollMs > 0
-        repeat: true
-        onTriggered: root.refresh()
-    }
-
-    Component.onCompleted: root.refresh()
+    Component.onCompleted: registerConsumer()
+    Component.onDestruction: unregisterConsumer()
 }

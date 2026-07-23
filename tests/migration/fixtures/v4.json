@@ -1,0 +1,22 @@
+{
+  "version": 4,
+  "app": {
+    "performanceMode": false
+  },
+  "bar": {},
+  "theme": {},
+  "modules": {
+    "left": [],
+    "center": [],
+    "right": [],
+    "instances": {}
+  },
+  "panels": {},
+  "services": {},
+  "ui": {},
+  "migration": {
+    "sourceVersion": 3,
+    "migratedAt": "2026-01-01T00:00:00Z",
+    "unmapped": {}
+  }
+}

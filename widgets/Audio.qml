@@ -5,22 +5,27 @@ Pill {
     id: root
 
     property var sink: Pipewire.defaultAudioSink
-    property var osd: null
     property bool hasAudio: sink && sink.audio
     property real volume: hasAudio ? sink.audio.volume : 0
     property bool isMuted: hasAudio ? sink.audio.muted : true
+    readonly property bool showPercentage: moduleSettings.showPercentage === undefined
+                                               ? settings.audioShowPercentage
+                                               : Boolean(moduleSettings.showPercentage)
+    readonly property bool showDeviceName: moduleSettings.showDeviceName === undefined
+                                               ? settings.audioShowDeviceName
+                                               : Boolean(moduleSettings.showDeviceName)
 
     icon: audioIcon()
     text: audioText()
-    detailText: settings.widgetStyle === "expanded" ? audioDeviceName() : ""
+    detailText: settings.widgetStyle === "expanded" && showDeviceName ? audioDeviceName() : ""
     muted: isMuted || !hasAudio
     progress: hasAudio ? Math.max(0, Math.min(1, volume)) : -1
     progressColor: isMuted ? theme.alpha(theme.textMuted, 0.10) : theme.alpha(theme.accent, 0.16)
     iconMorphOnChange: settings.iconMorphTransitions
     textPulseOnChange: hasAudio && text.length > 0
-    maximumTextWidth: settings.audioShowDeviceName ? 140 : 54
+    maximumTextWidth: showDeviceName ? theme.moduleAudioDeviceWidth : theme.moduleBatteryValueWidth
     detailsOnClick: true
-    detailsModuleName: "audio"
+    detailsModuleName: moduleInstanceId || "audio"
     scrollable: hasAudio
     onScrolled: function(steps, wheel) {
         changeVolume(steps);
@@ -50,9 +55,9 @@ Pill {
         if (!hasAudio) return "off";
 
         const parts = [];
-        if (settings.audioShowPercentage) parts.push(Math.round(volume * 100) + "%");
+        if (showPercentage) parts.push(Math.round(volume * 100) + "%");
 
-        if (settings.audioShowDeviceName) {
+        if (showDeviceName) {
             const name = audioDeviceName();
             if (name.length > 0) parts.push(name);
         }
@@ -68,10 +73,6 @@ Pill {
 
         if (next > 0 && sink.audio.muted) {
             sink.audio.muted = false;
-        }
-
-        if (osd && typeof osd.show === "function") {
-            osd.show(audioIconFor(next, false), next);
         }
     }
 

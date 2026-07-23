@@ -5,6 +5,8 @@ Rectangle {
 
     property var theme
     property var settings
+    property string moduleInstanceId: ""
+    property var moduleSettings: ({})
     property string icon: ""
     property string text: ""
     property string detailText: ""
@@ -42,13 +44,9 @@ Rectangle {
     property int iconFadeDuration: settings.motionNormal
     property bool iconMorphOnChange: false
     property int iconMorphDuration: settings.motionNormal
-    property bool iconPulseActive: false
-    property real iconPulseMinimumOpacity: 0.7
-    property int iconPulseDuration: settings ? settings.motionBreath : 0
     property real textPulseOpacity: 1
     property real iconFadeOpacity: 1
     property real iconMorphScale: 1
-    property real iconPulseOpacity: 1
     property bool pulseAnimationsEnabled: !settings || settings.motionPulse > 0
     property string displayedIcon: icon
     property string pendingIcon: icon
@@ -183,20 +181,6 @@ Rectangle {
         iconFade.restart();
     }
 
-    onIconPulseActiveChanged: {
-        if (!iconPulseActive) {
-            iconPulse.stop();
-            iconPulseOpacity = 1;
-        }
-    }
-
-    onPulseAnimationsEnabledChanged: {
-        if (!pulseAnimationsEnabled) {
-            iconPulse.stop();
-            iconPulseOpacity = 1;
-        }
-    }
-
     Item {
         id: progressClip
 
@@ -250,7 +234,7 @@ Rectangle {
             height: content.height
             text: root.displayedIcon
             color: root.primaryContentColor()
-            opacity: root.iconFadeOpacity * root.iconPulseOpacity
+            opacity: root.iconFadeOpacity
             scale: root.iconMorphScale
             font.family: settings.fontFamilyIcon
             font.pixelSize: settings.effectiveIconSize
@@ -457,29 +441,6 @@ Rectangle {
             property: "iconFadeOpacity"
             to: 1
             duration: Math.max(0, Math.round(root.iconFadeDuration / 2))
-            easing.type: Easing.OutCubic
-        }
-    }
-
-    SequentialAnimation {
-        id: iconPulse
-
-        running: root.iconPulseActive && root.pulseAnimationsEnabled
-        loops: Animation.Infinite
-
-        NumberAnimation {
-            target: root
-            property: "iconPulseOpacity"
-            to: root.iconPulseMinimumOpacity
-            duration: Math.max(0, Math.round(root.iconPulseDuration / 2))
-            easing.type: Easing.InCubic
-        }
-
-        NumberAnimation {
-            target: root
-            property: "iconPulseOpacity"
-            to: 1
-            duration: Math.max(0, Math.round(root.iconPulseDuration / 2))
             easing.type: Easing.OutCubic
         }
     }

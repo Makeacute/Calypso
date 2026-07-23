@@ -181,7 +181,7 @@ PanelWindow {
     screen: panelWindow ? panelWindow.screen : Quickshell.screens[0]
     visible: open || reveal > 0.001
     focusable: false
-    color: "transparent"
+    color: theme.transparent
     anchors.left: true
     anchors.right: true
     anchors.top: true

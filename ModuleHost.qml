@@ -1,13 +1,13 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import "widgets"
 
 Item {
     id: root
 
     property var theme
     property var settings
+    property var appContext
     property var compositor
     property var panelWindow
     property var osd
@@ -19,8 +19,14 @@ Item {
     property bool backgroundReady: true
     property bool interactionReady: true
     property bool settingsOpen: false
-    readonly property Component selectedComponent: componentFor(moduleName)
-    readonly property bool moduleEnabled: active && phaseReady(moduleName) && selectedComponent !== null && settings && settings.enabled(moduleName)
+    readonly property string moduleType: settings ? settings.moduleId(moduleName) : moduleName
+    readonly property var moduleSettings: settings && typeof settings.instanceSettings === "function"
+                                                  ? settings.instanceSettings(moduleName) || ({})
+                                                  : ({})
+    readonly property url moduleSource: settings && settings.registry
+                                                ? settings.registry.sourceUrl(moduleType)
+                                                : ""
+    readonly property bool moduleEnabled: active && phaseReady(moduleName) && moduleSource.toString().length > 0 && settings && settings.enabled(moduleName)
     readonly property real loadedWidth: itemWidth()
     readonly property real loadedHeight: itemHeight()
     readonly property bool moduleVisible: moduleEnabled && loader.status === Loader.Ready && loadedWidth > 0 && loadedHeight > 0
@@ -52,8 +58,139 @@ Item {
 
         anchors.centerIn: parent
         active: root.moduleEnabled
-        sourceComponent: root.selectedComponent
+        onLoaded: root.applyInjectedProperties()
     }
+
+    Binding {
+        target: loader.item
+        property: "systemStatsService"
+        value: root.appContext ? root.appContext.systemStatsService : null
+        when: loader.item && (root.moduleType === "cpu" || root.moduleType === "memory")
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Binding {
+        target: loader.item
+        property: "networkService"
+        value: root.appContext ? root.appContext.networkService : null
+        when: loader.item && root.moduleType === "network"
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Binding {
+        target: loader.item
+        property: "batteryService"
+        value: root.appContext ? root.appContext.batteryService : null
+        when: loader.item && root.moduleType === "battery"
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Binding {
+        target: loader.item
+        property: "mediaService"
+        value: root.appContext ? root.appContext.mediaService : null
+        when: loader.item && root.moduleType === "media"
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Binding {
+        target: loader.item
+        property: "powerProfileService"
+        value: root.appContext ? root.appContext.powerProfileService : null
+        when: loader.item && root.moduleType === "powerProfile"
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Connections {
+        target: loader.item
+        ignoreUnknownSignals: true
+
+        function onDetailsRequested(anchorItem, requestedModule) {
+            root.moduleDetailsRequested(String(requestedModule || root.moduleType), anchorItem);
+        }
+
+        function onRequested(anchorItem) {
+            if (root.moduleType === "clock")
+                root.clockRequested(anchorItem);
+            else if (root.moduleType === "dashboard")
+                root.controlsRequested(anchorItem);
+            else if (root.moduleType === "settings")
+                root.settingsRequested(anchorItem);
+        }
+
+        function onNotificationsRequested(anchorItem) {
+            root.notificationsRequested(anchorItem);
+        }
+
+        function onTriggerRequested(panelId, anchorItem) {
+            root.moduleDetailsRequested(String(panelId || root.moduleType), anchorItem);
+        }
+    }
+
+    function setItemProperty(name, value) {
+        const item = loader.item;
+        if (!item)
+            return;
+        try {
+            item[name] = value;
+        } catch (error) {
+            console.warn("Unable to inject " + name + " into " + moduleType + ": " + error);
+        }
+    }
+
+    function initialProperties() {
+        const values = {
+            "theme": theme,
+            "settings": settings,
+            "systemStatsService": appContext ? appContext.systemStatsService : null,
+            "networkService": appContext ? appContext.networkService : null,
+            "batteryService": appContext ? appContext.batteryService : null,
+            "mediaService": appContext ? appContext.mediaService : null,
+            "powerProfileService": appContext ? appContext.powerProfileService : null,
+            "moduleInstanceId": moduleName,
+            "moduleSettings": moduleSettings,
+            "compositor": compositor,
+            "panelWindow": panelWindow,
+            "osd": osd,
+            "tooltipHost": tooltipHost,
+            "settingsOpen": settingsOpen,
+            "notificationOpen": notificationOpen,
+            "notificationCount": notificationCount
+        };
+        const result = {};
+        const names = settings && settings.registry ? settings.registry.injectionNames(moduleType) : [];
+        for (let i = 0; i < names.length; i++)
+            result[names[i]] = values[names[i]];
+        return result;
+    }
+
+    function configureSource() {
+        if (moduleSource.toString().length > 0)
+            loader.setSource(moduleSource, initialProperties());
+        else
+            loader.source = "";
+    }
+
+    function applyInjectedProperties() {
+        const values = initialProperties();
+        const names = Object.keys(values);
+        for (let i = 0; i < names.length; i++)
+            setItemProperty(names[i], values[names[i]]);
+    }
+
+    Component.onCompleted: configureSource()
+    onModuleSourceChanged: configureSource()
+    onThemeChanged: applyInjectedProperties()
+    onSettingsChanged: applyInjectedProperties()
+    onAppContextChanged: applyInjectedProperties()
+    onModuleSettingsChanged: applyInjectedProperties()
+    onCompositorChanged: applyInjectedProperties()
+    onPanelWindowChanged: applyInjectedProperties()
+    onOsdChanged: applyInjectedProperties()
+    onTooltipHostChanged: applyInjectedProperties()
+    onSettingsOpenChanged: applyInjectedProperties()
+    onNotificationOpenChanged: applyInjectedProperties()
+    onNotificationCountChanged: applyInjectedProperties()
 
     function itemWidth() {
         const item = loader.item;
@@ -66,31 +203,9 @@ Item {
         return item ? Math.max(item.implicitHeight, item.height) : 0;
     }
 
-    function componentFor(name) {
-        if (name === "workspaces") return workspacesComponent;
-        if (name === "focusedWindow") return focusedWindowComponent;
-        if (name === "cpu") return cpuComponent;
-        if (name === "memory" || name === "ram") return memoryComponent;
-        if (name === "audio" || name === "volume") return audioComponent;
-        if (name === "brightness" || name === "backlight") return brightnessComponent;
-        if (name === "powerProfile" || name === "power") return powerProfileComponent;
-        if (name === "media" || name === "mpris" || name === "player") return mediaComponent;
-        if (name === "network" || name === "net") return networkComponent;
-        if (name === "bluetooth" || name === "bt") return bluetoothComponent;
-        if (name === "battery" || name === "bat") return batteryComponent;
-        if (name === "caffeine" || name === "idleInhibitor" || name === "idle") return caffeineComponent;
-        if (name === "clock" || name === "time") return clockComponent;
-        if (name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard") return controlsComponent;
-        if (name === "launcher" || name === "apps" || name === "appLauncher") return launcherComponent;
-        if (name === "notepad" || name === "scratchpad" || name === "notes") return notepadComponent;
-        if (name === "clipboard" || name === "cliphist" || name === "clip") return clipboardComponent;
-        if (name === "processes" || name === "processList" || name === "tasks") return processesComponent;
-        if (name === "tray") return trayComponent;
-        if (name === "settings") return settingsComponent;
-        return null;
-    }
-
     function loadPhase(name) {
+        if (settings && settings.registry)
+            return settings.registry.loadPhase(name);
         if (name === "workspaces" || name === "focusedWindow" || name === "clock" || name === "time")
             return 1;
         if (name === "settings" || name === "controls" || name === "controlCenter" || name === "quickControls" || name === "dashboard"
@@ -109,36 +224,4 @@ Item {
         return interactionReady;
     }
 
-    Component { id: workspacesComponent; Workspace { theme: root.theme; settings: root.settings; compositor: root.compositor } }
-    Component { id: focusedWindowComponent; FocusedWindow { theme: root.theme; settings: root.settings; compositor: root.compositor } }
-    Component { id: cpuComponent; Cpu { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: memoryComponent; Memory { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: audioComponent; Audio { theme: root.theme; settings: root.settings; osd: root.osd; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: brightnessComponent; Brightness { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: powerProfileComponent; PowerProfile { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost } }
-    Component { id: mediaComponent; Media { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost } }
-    Component { id: networkComponent; Network { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: bluetoothComponent; BluetoothStatus { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: batteryComponent; Battery { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: caffeineComponent; Caffeine { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; panelWindow: root.panelWindow } }
-    Component { id: clockComponent; Clock { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onRequested: function(anchorItem) { root.clockRequested(anchorItem); } } }
-    Component { id: controlsComponent; ControlCenterButton { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onRequested: function(anchorItem) { root.controlsRequested(anchorItem); } } }
-    Component { id: launcherComponent; Launcher { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: notepadComponent; Notepad { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: clipboardComponent; Clipboard { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: processesComponent; Processes { theme: root.theme; settings: root.settings; tooltipHost: root.tooltipHost; onDetailsRequested: function(anchorItem, moduleName) { root.moduleDetailsRequested(moduleName, anchorItem); } } }
-    Component { id: trayComponent; Tray { theme: root.theme; settings: root.settings; panelWindow: root.panelWindow } }
-    Component {
-        id: settingsComponent
-        SettingsButton {
-            theme: root.theme
-            settings: root.settings
-            tooltipHost: root.tooltipHost
-            settingsOpen: root.settingsOpen
-            notificationOpen: root.notificationOpen
-            notificationCount: root.notificationCount
-            onRequested: function(anchorItem) { root.settingsRequested(anchorItem); }
-            onNotificationsRequested: function(anchorItem) { root.notificationsRequested(anchorItem); }
-        }
-    }
 }

@@ -10,8 +10,12 @@ Pill {
     property real percent: 0
     property int rawCurrent: 0
     property int rawMax: 0
-    readonly property bool showPercentage: settingBool("brightnessShowPercentage", true)
-    readonly property int stepPercent: settingNumber("brightnessStep", 5, 1, 25)
+    readonly property bool showPercentage: moduleSettings.showPercentage === undefined
+                                               ? settingBool("brightnessShowPercentage", true)
+                                               : Boolean(moduleSettings.showPercentage)
+    readonly property int stepPercent: moduleSettings.step === undefined
+                                           ? settingNumber("brightnessStep", 5, 1, 25)
+                                           : Math.max(1, Math.min(25, Math.round(Number(moduleSettings.step))))
     readonly property int minimumPercent: settingNumber("brightnessMinPercent", 1, 1, 99)
     readonly property int pollMs: settingPollMs("brightnessPollMs", "brightnessMs", 15000)
 
@@ -24,9 +28,9 @@ Pill {
     scrollable: available && hasBrightnessctl && !setProc.running
     iconFadeOnChange: true
     textPulseOnChange: available && showPercentage
-    maximumTextWidth: 54
+    maximumTextWidth: theme.moduleBatteryValueWidth
     detailsOnClick: true
-    detailsModuleName: "brightness"
+    detailsModuleName: moduleInstanceId || "brightness"
     onScrolled: function(steps, wheel) {
         adjustBrightness(steps);
     }

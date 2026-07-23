@@ -1,0 +1,673 @@
+#!/usr/bin/env python3
+"""Migrate Calypso settings from the flat v3 schema to grouped v4."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import datetime as dt
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+import tempfile
+from typing import Any
+
+
+SOURCE_VERSION = 3
+TARGET_VERSION = 4
+
+ALIASES = {
+    "ram": "memory",
+    "net": "network",
+    "bt": "bluetooth",
+    "volume": "audio",
+    "backlight": "brightness",
+    "power": "powerProfile",
+    "mpris": "media",
+    "player": "media",
+    "bat": "battery",
+    "idleInhibitor": "caffeine",
+    "idle": "caffeine",
+    "time": "clock",
+    "controls": "dashboard",
+    "controlCenter": "dashboard",
+    "quickControls": "dashboard",
+    "apps": "launcher",
+    "appLauncher": "launcher",
+    "scratchpad": "notepad",
+    "notes": "notepad",
+    "cliphist": "clipboard",
+    "clip": "clipboard",
+    "processList": "processes",
+    "tasks": "processes",
+}
+
+RUNTIME_METADATA_KEYS = {
+    "availableModules",
+    "moduleRegistry",
+    "themeRecipes",
+}
+
+DIRECT_MAPPINGS = {
+    # Application-wide behavior.
+    "performanceMode": ("app", "performanceMode"),
+    "reduceMotion": ("app", "reduceMotion"),
+    # Bar geometry and presentation.
+    "barHeight": ("bar", "height"),
+    "screenMargin": ("bar", "screenMargin"),
+    "reserveSpace": ("bar", "reserveSpace"),
+    "groupPadding": ("bar", "groupPadding"),
+    "pillPadding": ("bar", "pillPadding"),
+    "groupSpacing": ("bar", "groupSpacing"),
+    "itemSpacing": ("bar", "itemSpacing"),
+    "groupRadius": ("bar", "groupRadius"),
+    "pillRadius": ("bar", "pillRadius"),
+    "barStyle": ("bar", "style"),
+    "barPosition": ("bar", "position"),
+    "barBlur": ("bar", "blur"),
+    "barOpacity": ("bar", "opacity"),
+    "barBorderEnabled": ("bar", "borderEnabled"),
+    "barBorderThickness": ("bar", "borderThickness"),
+    "barAutohide": ("bar", "autohide"),
+    "widgetStyle": ("bar", "widgetStyle"),
+    # Theme, typography, and motion.
+    "themeRecipe": ("theme", "recipe"),
+    "visualPreset": ("theme", "visualPreset"),
+    "surfaceStyle": ("theme", "surfaceStyle"),
+    "pillStyle": ("theme", "pillStyle"),
+    "hoverEffect": ("theme", "hoverEffect"),
+    "popupMotion": ("theme", "popupMotion"),
+    "animationProfile": ("theme", "animationProfile"),
+    "settingsPreset": ("theme", "settingsPreset"),
+    "iconMorphTransitions": ("theme", "iconMorphTransitions"),
+    "spacingScale": ("theme", "spacingScale"),
+    "radiusScale": ("theme", "radiusScale"),
+    "animationMs": ("theme", "animationMs"),
+    "motionFast": ("theme", "motionFast"),
+    "motionNormal": ("theme", "motionNormal"),
+    "motionHover": ("theme", "motionHover"),
+    "motionPulse": ("theme", "motionPulse"),
+    "motionBreath": ("theme", "motionBreath"),
+    "motionOpen": ("theme", "motionOpen"),
+    "motionClose": ("theme", "motionClose"),
+    "motionSpatial": ("theme", "motionSpatial"),
+    "motionEmphasis": ("theme", "motionEmphasis"),
+    "panelOpacity": ("theme", "panelOpacity"),
+    "blurEnabled": ("theme", "blurEnabled"),
+    "fontFamily": ("theme", "fontFamily"),
+    "fontFamilySans": ("theme", "fontFamilySans"),
+    "fontFamilyMono": ("theme", "fontFamilyMono"),
+    "fontFamilyIcon": ("theme", "fontFamilyIcon"),
+    "fontSize": ("theme", "fontSize"),
+    "iconSize": ("theme", "iconSize"),
+    "palettePath": ("theme", "palettePath"),
+    "paletteSource": ("theme", "paletteSource"),
+    "manualAccent": ("theme", "manualAccent"),
+    "customPaletteJson": ("theme", "customPaletteJson"),
+    "matugenEnabled": ("theme", "matugenEnabled"),
+    "matugenMode": ("theme", "matugenMode"),
+    "matugenScheme": ("theme", "matugenScheme"),
+    # Small global UI surfaces.
+    "tooltipDelay": ("ui", "tooltipDelay"),
+    "tooltipsEnabled": ("ui", "tooltipsEnabled"),
+    "workspaceToastTimeout": ("ui", "workspaceToastTimeout"),
+}
+
+PANEL_MAPPINGS = {
+    "settingsPanelWidth": ("settings", "width"),
+    "settingsPanelGap": ("settings", "gap"),
+    "settingsPanelPage": ("settings", "page"),
+    "settingsPanelMode": ("settings", "mode"),
+    "settingsPanelAnchor": ("settings", "anchor"),
+    "settingsPanelDensity": ("settings", "density"),
+    "settingsChangedFooter": ("settings", "changedFooter"),
+    "settingsPreviewEnabled": ("settings", "previewEnabled"),
+    "osdEnabled": ("osd", "enabled"),
+    "osdPosition": ("osd", "position"),
+    "osdStyle": ("osd", "style"),
+    "osdTimeout": ("osd", "timeout"),
+    "osdSize": ("osd", "size"),
+    "osdOpacity": ("osd", "opacity"),
+    "osdShowIcon": ("osd", "showIcon"),
+    "osdShowPercent": ("osd", "showPercent"),
+    "osdVolume": ("osd", "volume"),
+    "osdBrightness": ("osd", "brightness"),
+    "osdKeyboardBacklight": ("osd", "keyboardBacklight"),
+    "osdCapsLock": ("osd", "capsLock"),
+    "osdNumLock": ("osd", "numLock"),
+    "osdMedia": ("osd", "media"),
+    "osdBattery": ("osd", "battery"),
+    "calendarWeekStart": ("clock", "weekStart"),
+    "clockPanelShowWeek": ("clock", "showWeek"),
+    "clockPanelShowDayOfYear": ("clock", "showDayOfYear"),
+    "clockPanelShowTimezone": ("clock", "showTimezone"),
+    "dashboardPanelWidth": ("dashboard", "width"),
+    "dashboardShowMedia": ("dashboard", "showMedia"),
+    "dashboardShowWeather": ("dashboard", "showWeather"),
+    "dashboardGrowFromTrigger": ("dashboard", "growFromTrigger"),
+    "dashboardQuickToggles": ("dashboard", "quickToggles"),
+    "dashboardPerformanceModules": ("dashboard", "performanceModules"),
+    "notepadPanelWidth": ("notepad", "width"),
+    "notepadFilePath": ("notepad", "filePath"),
+    "notepadAutosaveMs": ("notepad", "autosaveMs"),
+    "clipboardPanelWidth": ("clipboard", "width"),
+    "clipboardMaxItems": ("clipboard", "maxItems"),
+    "processPanelWidth": ("processes", "width"),
+    "processListLimit": ("processes", "listLimit"),
+    "notificationsPanelWidth": ("notifications", "width"),
+    "notificationsMaxVisible": ("notifications", "maxVisible"),
+    "notificationsGroupByApp": ("notifications", "groupByApp"),
+    "notificationsGroupsExpanded": ("notifications", "groupsExpanded"),
+    "notificationsShowBody": ("notifications", "showBody"),
+    "notificationsShowImages": ("notifications", "showImages"),
+    "notificationsShowActions": ("notifications", "showActions"),
+    "launcherPanelWidth": ("launcher", "width"),
+    "launcherMaxResults": ("launcher", "maxResults"),
+    "launcherSearchPlaceholder": ("launcher", "searchPlaceholder"),
+    "launcherUseFuzzy": ("launcher", "useFuzzy"),
+    "launcherSortMode": ("launcher", "sortMode"),
+    "launcherShowIcons": ("launcher", "showIcons"),
+    "launcherShowDescriptions": ("launcher", "showDescriptions"),
+    "launcherCompactRows": ("launcher", "compactRows"),
+    "launcherVimKeybinds": ("launcher", "vimKeybinds"),
+    "launcherCloseOnLaunch": ("launcher", "closeOnLaunch"),
+    "launcherFavorites": ("launcher", "favorites"),
+    "launcherHiddenApps": ("launcher", "hiddenApps"),
+    "modulePopupPinned": ("modulePopup", "pinned"),
+    "modulePopupDefaultTab": ("modulePopup", "defaultTab"),
+    "modulePopupShowGauge": ("modulePopup", "showGauge"),
+    "modulePopupShowSparkline": ("modulePopup", "showSparkline"),
+    "modulePopupHistorySamples": ("modulePopup", "historySamples"),
+    "modulePopupNetworkScaleKib": ("modulePopup", "networkScaleKib"),
+}
+
+MODULE_SETTING_MAPPINGS = {
+    "workspaceIndicatorStyle": ("workspaces", "indicatorStyle"),
+    "workspaceMinWidth": ("workspaces", "minWidth"),
+    "workspaceShowNumbers": ("workspaces", "showNumbers"),
+    "workspaceShowOccupied": ("workspaces", "showOccupied"),
+    "workspaceShowAppIcons": ("workspaces", "showAppIcons"),
+    "workspaceMaxAppIcons": ("workspaces", "maxAppIcons"),
+    "workspaceScrollEnabled": ("workspaces", "scrollEnabled"),
+    "workspaceScrollWrap": ("workspaces", "scrollWrap"),
+    "focusedWindowMaxWidth": ("focusedWindow", "maxWidth"),
+    "focusedWindowShowTitle": ("focusedWindow", "showTitle"),
+    "focusedWindowDisplayMode": ("focusedWindow", "displayMode"),
+    "clockFormat": ("clock", "format"),
+    "clockShowSeconds": ("clock", "showSeconds"),
+    "audioShowPercentage": ("audio", "showPercentage"),
+    "audioShowDeviceName": ("audio", "showDeviceName"),
+    "networkInterfaceName": ("network", "interfaceName"),
+    "networkShowSpeed": ("network", "showSpeed"),
+    "batteryShowPercentage": ("battery", "showPercentage"),
+    "batteryCriticalThreshold": ("battery", "criticalThreshold"),
+    "cpuShowGraph": ("cpu", "showGraph"),
+    "memoryShowGraph": ("memory", "showGraph"),
+    "brightnessShowPercentage": ("brightness", "showPercentage"),
+    "brightnessStep": ("brightness", "step"),
+    "powerProfileShowLabel": ("powerProfile", "showLabel"),
+    "mediaShowControls": ("media", "showControls"),
+    "mediaMaxWidth": ("media", "maxWidth"),
+    "mediaMaxTitleLength": ("media", "maxTitleLength"),
+    "trayCompact": ("tray", "compact"),
+    "trayIconSize": ("tray", "iconSize"),
+    "trayMaxVisible": ("tray", "maxVisible"),
+}
+
+SERVICE_MAPPINGS = {
+    "polling": ("polling",),
+    "compositor": ("compositor",),
+    "clipboardBackend": ("clipboard", "backend"),
+    "wallpaperDirectory": ("wallpaper", "directory"),
+    "wallpaperRecursive": ("wallpaper", "recursive"),
+    "currentWallpaper": ("wallpaper", "current"),
+    "wallpaperFavorites": ("wallpaper", "favorites"),
+    "wallpaperBackend": ("wallpaper", "backend"),
+    "wallpaperResizeMode": ("wallpaper", "resizeMode"),
+    "wallpaperCropGravity": ("wallpaper", "cropGravity"),
+    "wallpaperApplyColors": ("wallpaper", "applyColors"),
+    "wallpaperTransition": ("wallpaper", "transition"),
+    "wallpaperTransitionDuration": ("wallpaper", "transitionDuration"),
+    "wallpaperTransitionFps": ("wallpaper", "transitionFps"),
+    "wallpaperTransitionPosition": ("wallpaper", "transitionPosition"),
+    "wallpaperTransitionAngle": ("wallpaper", "transitionAngle"),
+    "wallpaperTransitionBezier": ("wallpaper", "transitionBezier"),
+    "wallpaperRandomMode": ("wallpaper", "randomMode"),
+    "wallpaperSelectedPreview": ("wallpaper", "selectedPreview"),
+    "wallpaperLastError": ("wallpaper", "lastError"),
+    "wallpaperLastApplied": ("wallpaper", "lastApplied"),
+    "wallpaperLastPalette": ("wallpaper", "lastPalette"),
+}
+
+SECTION_KEYS = {
+    "leftModules": "left",
+    "centerModules": "center",
+    "rightModules": "right",
+}
+
+
+class MigrationError(Exception):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+class JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise MigrationError("invalid_arguments", message)
+
+
+def canonical_type(module_type: str) -> str:
+    return ALIASES.get(module_type, module_type)
+
+
+def set_nested(target: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    cursor = target
+    for key in path[:-1]:
+        cursor = cursor.setdefault(key, {})
+    cursor[path[-1]] = copy.deepcopy(value)
+
+
+def require_version(document: Any, expected: int | None = None) -> int:
+    if not isinstance(document, dict):
+        raise MigrationError("malformed_settings", "settings root must be a JSON object")
+    version = document.get("version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise MigrationError(
+            "unsupported_version",
+            "settings version must be an integer",
+        )
+    if expected is not None and version != expected:
+        raise MigrationError(
+            "unsupported_version",
+            f"expected settings version {expected}, found {version}",
+        )
+    return version
+
+
+def require_module_list(document: dict[str, Any], key: str) -> list[str]:
+    value = document.get(key, [])
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise MigrationError(
+            "malformed_settings",
+            f"{key} must be an array of strings",
+        )
+    return value
+
+
+def canonical_visibility(document: dict[str, Any]) -> tuple[dict[str, bool], list[str]]:
+    raw = document.get("moduleVisibility", {})
+    if not isinstance(raw, dict):
+        raise MigrationError(
+            "malformed_settings",
+            "moduleVisibility must be a JSON object",
+        )
+    for key, value in raw.items():
+        if not isinstance(key, str) or not isinstance(value, bool):
+            raise MigrationError(
+                "malformed_settings",
+                "moduleVisibility must map strings to booleans",
+            )
+
+    visibility: dict[str, bool] = {}
+    order: list[str] = []
+
+    # Explicit canonical values win over legacy aliases independent of key order.
+    for key, value in raw.items():
+        canonical = canonical_type(key)
+        if key == canonical:
+            visibility[canonical] = value
+            if canonical not in order:
+                order.append(canonical)
+    for key, value in raw.items():
+        canonical = canonical_type(key)
+        if canonical not in visibility:
+            visibility[canonical] = value
+        if canonical not in order:
+            order.append(canonical)
+    return visibility, order
+
+
+def allocate_instance_id(
+    module_type: str,
+    counts: dict[str, int],
+    used_ids: set[str],
+) -> str:
+    count = counts.get(module_type, 0) + 1
+    instance_id = module_type if count == 1 else f"{module_type}-{count}"
+    while instance_id in used_ids:
+        count += 1
+        instance_id = f"{module_type}-{count}"
+    counts[module_type] = count
+    return instance_id
+
+
+def migrate_document(document: dict[str, Any], migrated_at: str) -> dict[str, Any]:
+    if require_version(document) != SOURCE_VERSION:
+        raise MigrationError(
+            "unsupported_version",
+            f"only settings version {SOURCE_VERSION} can be migrated",
+        )
+
+    output: dict[str, Any] = {
+        "version": TARGET_VERSION,
+        "app": {},
+        "bar": {},
+        "theme": {},
+        "modules": {
+            "left": [],
+            "center": [],
+            "right": [],
+            "instances": {},
+        },
+        "panels": {},
+        "services": {},
+        "ui": {},
+        "migration": {
+            "sourceVersion": SOURCE_VERSION,
+            "migratedAt": migrated_at,
+            "unmapped": {},
+        },
+    }
+    consumed = {"version", *RUNTIME_METADATA_KEYS}
+
+    for source_key, path in DIRECT_MAPPINGS.items():
+        if source_key in document:
+            set_nested(output, path, document[source_key])
+            consumed.add(source_key)
+
+    for source_key, path in PANEL_MAPPINGS.items():
+        if source_key in document:
+            set_nested(output["panels"], path, document[source_key])
+            consumed.add(source_key)
+
+    for source_key, path in SERVICE_MAPPINGS.items():
+        if source_key in document:
+            set_nested(output["services"], path, document[source_key])
+            consumed.add(source_key)
+
+    module_settings: dict[str, dict[str, Any]] = {}
+    module_setting_order: list[str] = []
+    for source_key, (module_type, setting_name) in MODULE_SETTING_MAPPINGS.items():
+        if source_key not in document:
+            continue
+        if module_type not in module_settings:
+            module_settings[module_type] = {}
+            module_setting_order.append(module_type)
+        module_settings[module_type][setting_name] = copy.deepcopy(document[source_key])
+        consumed.add(source_key)
+
+    # This panel list names module types, not instances, but aliases still need to
+    # be normalized so old "ram"/"net" values survive the registry transition.
+    performance_modules = (
+        output.get("panels", {})
+        .get("dashboard", {})
+        .get("performanceModules")
+    )
+    if isinstance(performance_modules, list):
+        output["panels"]["dashboard"]["performanceModules"] = [
+            canonical_type(value) if isinstance(value, str) else value
+            for value in performance_modules
+        ]
+
+    visibility, visibility_order = canonical_visibility(document)
+    if "moduleVisibility" in document:
+        consumed.add("moduleVisibility")
+
+    show_settings = document.get("showSettingsButton")
+    if "showSettingsButton" in document:
+        if not isinstance(show_settings, bool):
+            raise MigrationError(
+                "malformed_settings",
+                "showSettingsButton must be a boolean",
+            )
+        consumed.add("showSettingsButton")
+
+    counts: dict[str, int] = {}
+    represented_types: set[str] = set()
+    instances: dict[str, dict[str, Any]] = output["modules"]["instances"]
+
+    def add_instance(module_type: str) -> str:
+        canonical = canonical_type(module_type)
+        instance_id = allocate_instance_id(canonical, counts, set(instances))
+        enabled = (
+            show_settings
+            if canonical == "settings" and isinstance(show_settings, bool)
+            else visibility.get(canonical, True)
+        )
+        instances[instance_id] = {
+            "type": canonical,
+            "enabled": enabled,
+            "settings": copy.deepcopy(module_settings.get(canonical, {})),
+        }
+        represented_types.add(canonical)
+        return instance_id
+
+    for source_key, section in SECTION_KEYS.items():
+        modules = require_module_list(document, source_key)
+        if source_key in document:
+            consumed.add(source_key)
+        output["modules"][section] = [add_instance(value) for value in modules]
+
+    # Preserve visibility and settings for modules which are currently unplaced.
+    for module_type in visibility_order:
+        if module_type not in represented_types:
+            add_instance(module_type)
+    for module_type in module_setting_order:
+        if module_type not in represented_types:
+            add_instance(module_type)
+    if isinstance(show_settings, bool) and "settings" not in represented_types:
+        add_instance("settings")
+
+    output["migration"]["unmapped"] = {
+        key: copy.deepcopy(value)
+        for key, value in document.items()
+        if key not in consumed
+    }
+    return output
+
+
+def json_bytes(document: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+
+
+def read_document(path: Path) -> tuple[bytes, dict[str, Any]]:
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise MigrationError("io_error", f"cannot read {path}: {error.strerror}") from error
+    try:
+        document = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise MigrationError("malformed_json", f"cannot parse {path}: {error}") from error
+    if not isinstance(document, dict):
+        raise MigrationError("malformed_settings", "settings root must be a JSON object")
+    return raw, document
+
+
+def fsync_directory(directory: Path) -> None:
+    descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def create_backup(directory: Path, raw: bytes, mode: int) -> Path:
+    for _ in range(100):
+        stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        backup = directory / f"settings.v3.{stamp}.json"
+        try:
+            descriptor = os.open(
+                backup,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                stat.S_IMODE(mode),
+            )
+        except FileExistsError:
+            continue
+        try:
+            os.fchmod(descriptor, stat.S_IMODE(mode))
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except Exception:
+            try:
+                backup.unlink()
+            except OSError:
+                pass
+            raise
+        fsync_directory(directory)
+        return backup
+    raise MigrationError("io_error", "could not allocate a unique backup filename")
+
+
+def atomic_write(path: Path, raw: bytes, mode: int) -> None:
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, stat.S_IMODE(mode))
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        fsync_directory(path.parent)
+    except Exception:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def timestamp() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def migrate_path(path: Path) -> dict[str, Any]:
+    raw, document = read_document(path)
+    version = require_version(document)
+    if version == TARGET_VERSION:
+        return {
+            "ok": True,
+            "operation": "migrate",
+            "status": "noop",
+            "version": TARGET_VERSION,
+            "path": str(path.absolute()),
+            "backup": None,
+        }
+    if version != SOURCE_VERSION:
+        raise MigrationError(
+            "unsupported_version",
+            f"only settings versions {SOURCE_VERSION} and {TARGET_VERSION} are supported; found {version}",
+        )
+
+    try:
+        mode = path.stat().st_mode
+    except OSError as error:
+        raise MigrationError("io_error", f"cannot stat {path}: {error.strerror}") from error
+
+    migrated = migrate_document(document, timestamp())
+    try:
+        backup = create_backup(path.parent, raw, mode)
+        atomic_write(path, json_bytes(migrated), mode)
+    except MigrationError:
+        raise
+    except OSError as error:
+        raise MigrationError("io_error", f"cannot migrate {path}: {error}") from error
+
+    return {
+        "ok": True,
+        "operation": "migrate",
+        "status": "migrated",
+        "fromVersion": SOURCE_VERSION,
+        "version": TARGET_VERSION,
+        "path": str(path.absolute()),
+        "backup": str(backup.absolute()),
+    }
+
+
+def rollback_path(path: Path, backup: Path) -> dict[str, Any]:
+    backup_raw, backup_document = read_document(backup)
+    require_version(backup_document, SOURCE_VERSION)
+    try:
+        mode = backup.stat().st_mode
+    except OSError as error:
+        raise MigrationError("io_error", f"cannot stat {backup}: {error.strerror}") from error
+
+    try:
+        current_raw = path.read_bytes()
+    except FileNotFoundError:
+        current_raw = None
+    except OSError as error:
+        raise MigrationError("io_error", f"cannot read {path}: {error.strerror}") from error
+
+    if current_raw == backup_raw:
+        status_value = "noop"
+    else:
+        try:
+            atomic_write(path, backup_raw, mode)
+        except OSError as error:
+            raise MigrationError("io_error", f"cannot restore {path}: {error}") from error
+        status_value = "rolled_back"
+
+    return {
+        "ok": True,
+        "operation": "rollback",
+        "status": status_value,
+        "version": SOURCE_VERSION,
+        "path": str(path.absolute()),
+        "backup": str(backup.absolute()),
+    }
+
+
+def parser() -> argparse.ArgumentParser:
+    result = JsonArgumentParser(
+        description="Migrate a Calypso settings file from schema v3 to v4.",
+    )
+    result.add_argument("settings_path", help="settings JSON file to migrate or restore")
+    result.add_argument(
+        "--rollback",
+        metavar="BACKUP",
+        help="restore SETTINGS_PATH from a v3 backup",
+    )
+    return result
+
+
+def emit(result: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def main() -> int:
+    try:
+        arguments = parser().parse_args()
+        path = Path(arguments.settings_path).expanduser()
+        if arguments.rollback:
+            result = rollback_path(path, Path(arguments.rollback).expanduser())
+        else:
+            result = migrate_path(path)
+        emit(result)
+        return 0
+    except MigrationError as error:
+        emit({"ok": False, "error": error.code, "message": str(error)})
+        return 2
+    except OSError as error:
+        emit({"ok": False, "error": "io_error", "message": str(error)})
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

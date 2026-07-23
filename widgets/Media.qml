@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 
 Item {
     id: root
@@ -7,15 +6,27 @@ Item {
     property var theme
     property var settings
     property var tooltipHost
-    property string playerName: ""
-    property string status: ""
-    property string title: ""
-    property string artist: ""
-    readonly property bool hasPlayer: playerName.length > 0
-    readonly property bool playing: status === "Playing"
-    readonly property bool canPrevious: hasPlayer
-    readonly property bool canToggle: hasPlayer
-    readonly property bool canNext: hasPlayer
+    property var mediaService
+    property string moduleInstanceId: "media"
+    property var moduleSettings: ({})
+    readonly property bool showControls: moduleSettings.showControls === undefined
+                                             ? settings.mediaShowControls
+                                             : Boolean(moduleSettings.showControls)
+    readonly property int maximumWidth: moduleSettings.maxWidth === undefined
+                                            ? settings.mediaMaxWidth
+                                            : Number(moduleSettings.maxWidth)
+    readonly property int maximumTitleLength: moduleSettings.maxTitleLength === undefined
+                                                  ? settings.mediaMaxTitleLength
+                                                  : Number(moduleSettings.maxTitleLength)
+    readonly property string playerName: mediaService ? String(mediaService.playerName || "") : ""
+    readonly property string status: mediaService ? String(mediaService.status || "") : ""
+    readonly property string title: mediaService ? String(mediaService.title || "") : ""
+    readonly property string artist: mediaService ? String(mediaService.artist || "") : ""
+    readonly property bool hasPlayer: mediaService ? Boolean(mediaService.hasPlayer) : false
+    readonly property bool playing: mediaService ? Boolean(mediaService.playing) : false
+    readonly property bool canPrevious: mediaService ? Boolean(mediaService.canPrevious) : false
+    readonly property bool canToggle: mediaService ? Boolean(mediaService.canToggle) : false
+    readonly property bool canNext: mediaService ? Boolean(mediaService.canNext) : false
 
     visible: hasPlayer || opacity > 0
     opacity: hasPlayer ? 1 : 0
@@ -42,46 +53,15 @@ Item {
         return String(value || "").trim();
     }
 
-    function shellQuote(value) {
-        return "'" + String(value || "").replace(/'/g, "'\\''") + "'";
-    }
-
-    function clearPlayer() {
-        playerName = "";
-        status = "";
-        title = "";
-        artist = "";
-    }
-
-    function updateMetadata(text) {
-        const line = String(text || "").trim().split("\n")[0] || "";
-        if (line.length <= 0) {
-            clearPlayer();
-            return;
-        }
-
-        const parts = line.split("|");
-        playerName = cleanText(parts[0]);
-        status = cleanText(parts[1]);
-        title = cleanText(parts[2]);
-        artist = cleanText(parts[3]);
-    }
-
-    function refresh() {
-        if (metadataProc.running) return;
-
-        metadataProc.command = [
-            "sh",
-            "-c",
-            "command -v playerctl >/dev/null 2>&1 && playerctl metadata --format '{{playerName}}|{{status}}|{{title}}|{{artist}}' 2>/dev/null || true"
-        ];
-        metadataProc.running = true;
-    }
-
     function runAction(action) {
-        if (!hasPlayer || actionProc.running) return;
-        actionProc.command = ["sh", "-c", "playerctl -p " + shellQuote(playerName) + " " + action + " >/dev/null 2>&1 || true"];
-        actionProc.running = true;
+        if (!mediaService || !hasPlayer)
+            return;
+        if (action === "play-pause")
+            mediaService.togglePlaying();
+        else if (action === "previous")
+            mediaService.previous();
+        else if (action === "next")
+            mediaService.next();
     }
 
     function trackText() {
@@ -90,7 +70,7 @@ Item {
         const safeTitle = cleanText(title);
         const safeArtist = cleanText(artist);
         const identity = cleanText(playerName);
-        const maxLength = Math.max(4, settings.mediaMaxTitleLength);
+        const maxLength = Math.max(4, maximumTitleLength);
         let label = "";
 
         if (safeTitle.length > 0 && safeArtist.length > 0) label = safeTitle + " - " + safeArtist;
@@ -121,7 +101,7 @@ Item {
             clickable: root.canToggle
             iconMorphOnChange: settings.iconMorphTransitions
             textPulseOnChange: true
-            maximumTextWidth: settings.mediaMaxWidth
+            maximumTextWidth: root.maximumWidth
             onClicked: root.runAction("play-pause")
         }
 
@@ -129,7 +109,7 @@ Item {
             theme: root.theme
             settings: root.settings
             tooltipHost: root.tooltipHost
-            visible: settings.mediaShowControls
+            visible: root.showControls
             icon: ""
             enabled: root.canPrevious
             muted: !root.canPrevious
@@ -142,7 +122,7 @@ Item {
             theme: root.theme
             settings: root.settings
             tooltipHost: root.tooltipHost
-            visible: settings.mediaShowControls
+            visible: root.showControls
             icon: root.playing ? "" : ""
             active: root.playing
             enabled: root.canToggle
@@ -157,7 +137,7 @@ Item {
             theme: root.theme
             settings: root.settings
             tooltipHost: root.tooltipHost
-            visible: settings.mediaShowControls
+            visible: root.showControls
             icon: ""
             enabled: root.canNext
             muted: !root.canNext
@@ -167,27 +147,4 @@ Item {
         }
     }
 
-    Process {
-        id: metadataProc
-
-        stdout: StdioCollector { onStreamFinished: root.updateMetadata(text) }
-        stderr: StdioCollector {}
-    }
-
-    Process {
-        id: actionProc
-
-        stdout: StdioCollector {}
-        stderr: StdioCollector {}
-        onExited: root.refresh()
-    }
-
-    Timer {
-        interval: settings.mediaPollMs
-        running: true
-        repeat: true
-        onTriggered: root.refresh()
-    }
-
-    Component.onCompleted: root.refresh()
 }

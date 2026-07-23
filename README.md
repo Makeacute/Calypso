@@ -1,164 +1,169 @@
 # Calypso
 
-Calypso is a lightweight Quickshell bar for Niri. Its design priorities are polished visuals, physical-feeling motion, and low idle cost: event-driven services are preferred, polling is explicit and configurable, and visual effects stay tokenized.
+Calypso is a Quickshell bar and shell toolkit for Niri. It prioritizes low idle
+cost, polished visuals, and physical-feeling motion.
 
-## Structure
+## Requirements
 
-- `shell.qml`: creates one `Bar` per Quickshell screen.
-- `Bar.qml`: owns settings, theme, compositor service, bar layout modes, popups, OSD, tooltip host, and workspace toast.
-- `Theme.qml`: Stylix palette adapter, safe dark fallbacks, color helpers, motion tokens, spacing tokens, and radius tokens.
-- `Settings.qml`: JSON adapter, derived sizing, motion compatibility values, module layout helpers, and schema defaults.
-- `Surface.qml`: shared rounded/translucent surface primitive.
-- `BarSection.qml`: island surface for one module section.
-- `ModuleHost.qml`: module id to widget component registry.
-- `SettingsPanel.qml`: live customization panel for appearance, layout, modules, widgets, behavior, and performance.
-- `ClockPanel.qml`, `DashboardPanel.qml`, `ModuleDetailsPanel.qml`, `SettingsPanel.qml`: anchored shell surfaces.
-- `services/`: compositor, Niri event-stream, and wallpaper/palette services.
-- `widgets/`: bar modules plus shared overlays such as `Osd.qml`, `TooltipHost.qml`, and `WorkspaceToast.qml`.
-- `tools/calypso-perf-audit`: read-only performance snapshot helper.
+- Quickshell 0.3 or newer
+- Niri
+- Nerd Font glyph coverage
+- PipeWire for audio controls
+- Optional: `awww` and Matugen for wallpaper-derived colors
+- Optional: power-profiles-daemon for power profile controls
+
+Run the shell directly:
+
+```sh
+quickshell -p ~/.config/quickshell --no-duplicate
+```
+
+Open the settings application:
+
+```sh
+quickshell ipc call calypso openSettings
+```
+
+## Architecture
+
+- `shell.qml` gates startup on settings migration.
+- `AppRuntime.qml` creates one `Bar` per screen.
+- `AppContext.qml` owns settings, theme, notifications, compositor state, the
+  settings window, IPC, and shared long-running services.
+- `SettingsStore.qml` exposes the v4 nested store plus the compatibility facade
+  used by existing widgets.
+- `SettingsWindow.qml` and `settingsui/` implement the dedicated live settings
+  application with search, undo/redo, module placement, and service health.
+- `ModuleRegistry.qml` is the source of truth for module metadata, aliases,
+  loading phase, injection contract, and QML source.
+- `ModuleHost.qml` loads registered modules generically.
+- `panels/PanelCoordinator.qml` gives anchored surfaces one focus owner.
+- `services/` contains event-driven media, battery, network, power profile,
+  compositor, notification, system-stat, and wallpaper integrations.
+- `Theme.qml` adapts Stylix/Matugen colors and owns all visual and motion tokens.
+
+The settings window is a normal desktop window. On Niri, Calypso resolves its
+window ID when opened, moves that exact window to the floating layout, sizes it,
+and centers it. No persistent compositor rule is required.
+
+## Settings Schema
+
+Schema v4 groups settings by ownership:
+
+```json
+{
+  "version": 4,
+  "app": {},
+  "bar": {},
+  "theme": {},
+  "modules": {
+    "left": [],
+    "center": [],
+    "right": [],
+    "instances": {}
+  },
+  "panels": {},
+  "services": {},
+  "ui": {},
+  "migration": {}
+}
+```
+
+Placement lanes contain stable instance IDs. Each entry in
+`modules.instances` stores its module type, enabled state, and instance settings.
+This permits more than one instance of a reusable module without coupling
+placement to implementation metadata.
+
+Changes save atomically after a short debounce. The settings application keeps a
+50-operation undo/redo history and coalesces slider gestures into one operation.
+
+### Migration
+
+Startup runs `tools/calypso-migrate-settings` before creating the shell. A v3
+file is migrated exactly once and its original bytes are retained beside it as
+`settings.v3.<timestamp>.json`. Malformed and unsupported files are not
+overwritten.
+
+Manual migration and rollback:
+
+```sh
+tools/calypso-migrate-settings settings.json
+tools/calypso-migrate-settings settings.json --rollback settings.v3.<timestamp>.json
+```
 
 ## Design System
 
-Colors come from `Theme.qml`. `Theme.alpha(color, opacity)` is the shared alpha helper. If `~/.config/stylix/palette.json` is missing or malformed, Calypso falls back to a complete dark palette.
+Widgets use `theme.*` and `settings.effective*` values for colors, dimensions,
+spacing, radii, and motion. `Theme.qml` remains usable when the configured
+palette is missing or malformed by falling back to its complete dark palette.
 
-Motion is centralized:
+All token-derived animation collapses when `settings.reduceMotion` is enabled.
+`settings.performanceMode` also disables expensive effects and service sampling
+that is not needed for core behavior.
 
-```qml
-theme.motionFast
-theme.motionNormal
-theme.motionHover
-theme.motionPulse
-theme.motionBreath
-theme.motionOpen
-theme.motionClose
+Modules support:
+
+- `iconOnly`
+- `iconAndText`
+- `expanded`
+
+The bar supports `islands`, `solid`, and `pill` layouts at both the top and
+bottom screen edges.
+
+## Shared Services
+
+CPU and memory share one consumer-gated sampler. Network throughput sampling is
+also consumer-gated. Widgets and persistent panels increment service consumers
+only while they need samples and release them on close or destruction.
+
+Media uses native MPRIS events. Battery uses UPower with a configurable sysfs
+fallback. Network state follows `ip monitor` and reconnects. Power profiles use
+power-profiles-daemon when available. Each service exposes health state and its
+last error to the settings Overview.
+
+Polling fallbacks live under `services.polling` in `settings.json`; no widget
+owns an unconfigurable background interval.
+
+## Adding A Module
+
+1. Add `widgets/MyModule.qml`; prefer `Pill.qml` for compact modules.
+2. Add one entry to `ModuleRegistry.qml` with source, aliases, category, loading
+   phase, default section, cost, and capabilities.
+3. Add an instance default to `settingscore/SettingsDefaults.js`.
+4. Add the instance ID to a default lane in `settings.example.json` when it
+   should ship enabled.
+5. Add module-specific settings controls to `settingsui/ModuleConfig.qml`.
+6. Verify every widget style, bar style, and bar position.
+
+`ModuleHost.qml` does not need a component switch entry.
+
+## IPC
+
+The global `calypso` target routes monitor-specific surfaces to the focused
+screen and keeps settings as one application window.
+
+Examples:
+
+```sh
+quickshell ipc call calypso openSettingsPage modules
+quickshell ipc call calypso openSettingsDetail network
+quickshell ipc call calypso openDashboard
+quickshell ipc call calypso openLauncherQuery firefox
+quickshell ipc call calypso setBarStyle islands
+quickshell ipc call calypso setBarPosition bottom
+quickshell ipc call calypso setWidgetStyle expanded
 ```
-
-`settings.reduceMotion` sets `theme.motionScale` to `0`, collapsing token-derived animations to instant state changes.
-
-Spacing and radius scale globally through:
-
-```json
-"spacingScale": 1.0,
-"radiusScale": 1.0
-```
-
-Use `theme.spacingXS/S/M/L/XL`, `theme.radiusS/M/L/XL`, or the existing `settings.effective*` values. Do not hardcode colors, pixel sizes, or animation durations in new widgets.
-
-## Bar Modes
-
-`settings.barStyle` controls the bar container without changing module components:
-
-- `islands`: separate floating left, center, and right groups.
-- `solid`: one continuous full-width strip.
-- `pill`: one centered island containing all configured modules.
-
-`settings.barPosition` supports `top` and `bottom`. Anchored popups move above the bar in bottom mode. `settings.barAutohide` slides the bar content off edge while preserving a hover target.
-
-## Wallpaper And Colors
-
-The wallpaper selector scans `wallpaperDirectory`, optionally recursively, and applies images through `awww`. Transitions are controlled by `wallpaperTransition`, `wallpaperTransitionDuration`, `wallpaperTransitionFps`, `wallpaperTransitionPosition`, `wallpaperTransitionAngle`, and `wallpaperTransitionBezier`.
-
-When `wallpaperApplyColors` and `matugenEnabled` are true, Calypso runs `matugen image` and writes a Base16-compatible `palette.json`. `Theme.qml` watches that file and falls back to a dark palette if it is missing or malformed.
-
-## Notifications
-
-`Bar.qml` owns a Quickshell notification service for non-transient desktop notifications. `SettingsButton.qml` shows the queue badge, and the badge/right-click path opens a notification drawer with app grouping, notification bodies/images, dismiss controls, and app-provided action buttons.
-
-## Adding A Widget
-
-1. Add `widgets/MyWidget.qml`. Prefer `Pill` for compact bar modules.
-2. Register the id in `ModuleHost.qml`.
-3. Add module metadata to `Settings.qml` `moduleRegistry`.
-4. Add the id to `availableModules`, `moduleVisibility`, and a default section list in `settings.json` if it should be available by default.
-5. Add settings-panel controls only for behavior the widget actually supports.
-
-Widgets should support `settings.widgetStyle`:
-
-- `iconOnly`: icon only.
-- `iconAndText`: icon plus compact value.
-- `expanded`: icon, value, and lightweight detail text.
-
-`Pill.qml` handles icon/text hiding, animated width, hover scale, color transitions, scroll/click routing, and delayed tooltips.
-
-## Settings Keys
-
-Core layout:
-
-- `barStyle`, `barPosition`, `barAutohide`
-- `barHeight`, `screenMargin`, `reserveSpace`
-- `leftModules`, `centerModules`, `rightModules`, `moduleVisibility`
-
-Appearance:
-
-- `barBlur`, `barOpacity`, `barBorderEnabled`, `barBorderThickness`
-- `spacingScale`, `radiusScale`
-- `fontFamily`, `fontFamilySans`, `fontFamilyMono`, `fontFamilyIcon`, `fontSize`, `iconSize`, `trayIconSize`
-- `widgetStyle`
-
-Behavior and motion:
-
-- `reduceMotion`, `performanceMode`, `animationMs`
-- `motionFast`, `motionNormal`, `motionHover`, `motionPulse`, `motionBreath`, `motionOpen`, `motionClose`, `motionSpatial`, `motionEmphasis`
-- `iconMorphTransitions`
-- `osdEnabled`, `osdPosition`, `osdStyle`, `osdSize`, `osdOpacity`, `osdTimeout`
-- `osdShowIcon`, `osdShowPercent`, `osdVolume`, `osdBrightness`, `osdKeyboardBacklight`, `osdCapsLock`, `osdNumLock`, `osdMedia`, `osdBattery`
-- `tooltipDelay`, `tooltipsEnabled`, `workspaceToastTimeout`
-
-Widget options:
-
-- `clockFormat`, `clockShowSeconds`, `calendarWeekStart`
-- `audioShowPercentage`, `audioShowDeviceName`
-- `networkShowSpeed`, `networkInterfaceName`
-- `batteryShowPercentage`, `batteryCriticalThreshold`
-- `modulePopupShowGauge`, `modulePopupShowSparkline`, `modulePopupHistorySamples`, `modulePopupNetworkScaleKib`
-- `dashboardPanelWidth`, `dashboardShowMedia`, `dashboardShowWeather`, `dashboardGrowFromTrigger`
-- `dashboardQuickToggles`, `dashboardPerformanceModules`, `polling.dashboardMediaMs`, `polling.dashboardStateMs`
-- `notepadPanelWidth`, `notepadFilePath`, `notepadAutosaveMs`
-- `clipboardPanelWidth`, `clipboardBackend`, `clipboardMaxItems`
-- `processPanelWidth`, `processListLimit`, `polling.processListMs`
-- `notificationsPanelWidth`, `notificationsMaxVisible`, `notificationsGroupByApp`, `notificationsGroupsExpanded`
-- `notificationsShowBody`, `notificationsShowImages`, `notificationsShowActions`
-- `launcherPanelWidth`, `launcherMaxResults`, `launcherSearchPlaceholder`
-- `launcherUseFuzzy`, `launcherSortMode`, `launcherShowIcons`, `launcherShowDescriptions`, `launcherCompactRows`
-- `launcherVimKeybinds`, `launcherCloseOnLaunch`, `launcherFavorites`, `launcherHiddenApps`
-- `mediaShowControls`, `mediaMaxWidth`, `mediaMaxTitleLength`
-- `cpuShowGraph`, `memoryShowGraph`
-- `brightnessShowPercentage`, `brightnessStep`
-- `powerProfileShowLabel`
-- `trayCompact`, `trayMaxVisible`
-- `workspaceShowAppIcons`, `workspaceMaxAppIcons`, and other workspace/focused-window display options
-
-Wallpaper:
-
-- `palettePath`, `paletteSource`, `manualAccent`
-- `wallpaperDirectory`, `wallpaperRecursive`, `currentWallpaper`, `wallpaperFavorites`
-- `wallpaperBackend`, `wallpaperResizeMode`, `wallpaperCropGravity`
-- `wallpaperApplyColors`, `matugenEnabled`, `matugenMode`, `matugenScheme`
-- `wallpaperTransition`, `wallpaperTransitionDuration`, `wallpaperTransitionFps`, `wallpaperTransitionPosition`, `wallpaperTransitionAngle`, `wallpaperTransitionBezier`
-- `wallpaperLastApplied`, `wallpaperLastPalette`, `wallpaperLastError`
-
-Polling:
-
-- `polling.cpuMs`
-- `polling.memoryMs`
-- `polling.networkMs`
-- `polling.batteryFallbackMs`
-- `polling.clockMs`
-- `polling.brightnessMs`
-- `polling.powerProfileMs`
-- `polling.processListMs`
 
 ## Verification
 
-Useful checks:
-
 ```sh
 python3 -m json.tool settings.json >/dev/null
-quickshell list --all
-tail -n 120 /run/user/1000/quickshell/by-id/<instance>/log.qslog | strings | rg 'WARN|ERROR'
-niri msg --json workspaces
-niri msg --json windows
-top -b -n 1 -p <quickshell-pid>
+python3 -m json.tool settings.example.json >/dev/null
+python3 -m unittest discover -s tests/migration -p 'test_*.py' -v
+git diff --check
+tail -n 120 /run/user/1000/quickshell/by-id/<instance>/log.qslog \
+  | strings | rg 'WARN|ERROR'
 ```
 
-`qmllint` is available on this system, but without Quickshell/Qt import metadata it emits unresolved-import noise. Treat runtime logs as the authoritative warning source.
+For animation, polling, or persistent-surface work, compare at least 60 seconds
+of idle CPU against a baseline with the surface closed and open.

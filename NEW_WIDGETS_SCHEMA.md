@@ -1,5 +1,9 @@
 # New Widgets Schema
 
+> Historical design note. The implemented v4 registry and instance schema live
+> in `ModuleRegistry.qml`, `SettingsStore.qml`, and
+> `settingscore/SettingsDefaults.js`.
+
 Agent 3 additive feature pass for the Quickshell bar overhaul. Tray already exists. Disk is intentionally excluded and should not be added in this merge.
 
 ## Missing Widget Confirmation

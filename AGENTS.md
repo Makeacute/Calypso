@@ -44,8 +44,11 @@ polished visuals, physical-feeling motion. Read this fully before making changes
 
 ## Architecture
 
-- `shell.qml` creates one `Bar` per screen. `Bar.qml` owns settings, theme,
-  compositor service, layout modes, popups, OSD, tooltip host, workspace toast.
+- `shell.qml` runs schema migration before `AppRuntime.qml` creates one `Bar`
+  per screen. `AppContext.qml` owns the shared settings store, theme,
+  compositor, notifications, IPC, settings window, and long-running services.
+  `Bar.qml` owns per-screen layout modes, anchored panels, OSD, tooltip host,
+  and workspace toast.
 - Services (`services/`) should be compositor-abstracted where reasonable — this
   project targets Niri specifically via `NiriService.qml`, but keep
   `CompositorService.qml` as the seam if that ever needs to change.
@@ -55,10 +58,10 @@ polished visuals, physical-feeling motion. Read this fully before making changes
   windows tile correctly around it. This must stay correct across
   `barHeight`/`barPosition`/`barAutohide` changes, including mid-transition
   during autohide slide animations.
-- Widget registration: add `widgets/X.qml` → register id in `ModuleHost.qml` →
-  add metadata to `Settings.qml` `moduleRegistry` → add id to
-  `availableModules`/`moduleVisibility`/a default section list in
-  `settings.json` if it should ship enabled by default.
+- Widget registration: add `widgets/X.qml` → add metadata and source to
+  `ModuleRegistry.qml` → add instance defaults to
+  `settingscore/SettingsDefaults.js` → add an instance id to a default lane in
+  `settings.example.json` if it should ship enabled by default.
 
 ## Verification checklist (run before marking any task complete)
 

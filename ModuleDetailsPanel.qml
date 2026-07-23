@@ -11,6 +11,11 @@ PopupWindow {
     property var theme
     property var settings
     property var panelWindow
+    property var systemStatsService: null
+    property var networkService: null
+    property var batteryService: null
+    property var mediaService: null
+    property var powerProfileService: null
     property var anchorItem: null
     property string moduleName: ""
     property int panelWidth: settings ? Math.round(Math.min(panelWindow ? panelWindow.width : settings.effectiveSpacingXL * 22, Math.max(settings.effectiveSpacingXL * 18, Math.min(settings.settingsPanelWidth, settings.effectiveSpacingXL * 22)))) : 528
@@ -26,14 +31,46 @@ PopupWindow {
     property var memoryHistory: []
     property var networkHistory: []
     property var batteryHistory: []
-    property real previousNetworkRx: 0
-    property real previousNetworkTx: 0
-    property real previousNetworkStamp: 0
     property real networkRxRate: 0
     property real networkTxRate: 0
     property bool pendingRefresh: false
     property string queuedActionCommand: ""
+    property var _systemStatsConsumerService: null
+    property var _networkConsumerService: null
     readonly property bool hasAudio: sink && sink.audio
+
+    onPanelOpenChanged: {
+        syncServiceConsumers();
+        if (panelOpen)
+            syncSharedData();
+    }
+    onModuleNameChanged: {
+        syncServiceConsumers();
+        if (panelOpen)
+            syncSharedData();
+    }
+    onSystemStatsServiceChanged: {
+        syncServiceConsumers();
+        if (panelOpen)
+            syncSharedData();
+    }
+    onNetworkServiceChanged: {
+        syncServiceConsumers();
+        if (panelOpen)
+            syncSharedData();
+    }
+    onBatteryServiceChanged: {
+        if (panelOpen)
+            syncSharedData();
+    }
+    onMediaServiceChanged: {
+        if (panelOpen)
+            syncSharedData();
+    }
+    onPowerProfileServiceChanged: {
+        if (panelOpen)
+            syncSharedData();
+    }
 
     function shellQuote(value) {
         return "'" + String(value || "").replace(/'/g, "'\\''") + "'";
@@ -53,6 +90,143 @@ PopupWindow {
         topRows = [];
         listRows = [];
         ipRows = [];
+    }
+
+    function syncServiceConsumers() {
+        const needsSystemStats = panelOpen && systemStatsService
+                && (moduleName === "cpu" || moduleName === "memory");
+        if (_systemStatsConsumerService
+                && (_systemStatsConsumerService !== systemStatsService || !needsSystemStats)) {
+            _systemStatsConsumerService.removeConsumer();
+            _systemStatsConsumerService = null;
+        }
+        if (needsSystemStats && !_systemStatsConsumerService) {
+            systemStatsService.addConsumer();
+            _systemStatsConsumerService = systemStatsService;
+        }
+
+        const needsNetwork = panelOpen && networkService && moduleName === "network";
+        if (_networkConsumerService
+                && (_networkConsumerService !== networkService || !needsNetwork)) {
+            _networkConsumerService.removeConsumer();
+            _networkConsumerService = null;
+        }
+        if (needsNetwork && !_networkConsumerService) {
+            networkService.addConsumer();
+            _networkConsumerService = networkService;
+        }
+    }
+
+    function releaseServiceConsumers() {
+        if (_systemStatsConsumerService) {
+            _systemStatsConsumerService.removeConsumer();
+            _systemStatsConsumerService = null;
+        }
+        if (_networkConsumerService) {
+            _networkConsumerService.removeConsumer();
+            _networkConsumerService = null;
+        }
+    }
+
+    function mergeDetailData(data) {
+        if (!data) return;
+        const name = String(data.module || moduleName);
+        if (name !== moduleName) return;
+        detailData = Object.assign({}, detailData, data, { "module": moduleName });
+    }
+
+    function batteryDeviceName() {
+        if (!batteryService) return "";
+        if (batteryService.nativeDevice)
+            return String(batteryService.nativeDevice.nativePath || batteryService.nativeDevice.model || "");
+        const batteries = Array.from(batteryService.fallbackBatteries || []);
+        return batteries.length > 0 ? String(batteries[0].name || "") : "";
+    }
+
+    function sharedDataFor(name) {
+        if (name === "cpu" && systemStatsService) {
+            return {
+                "module": name,
+                "usage": systemStatsService.cpuUsage
+            };
+        }
+        if (name === "memory" && systemStatsService) {
+            return {
+                "module": name,
+                "mem_total": systemStatsService.memoryTotalBytes / 1024,
+                "mem_available": systemStatsService.memoryAvailableBytes / 1024,
+                "mem_used": systemStatsService.memoryUsedBytes / 1024,
+                "mem_percent": systemStatsService.memoryUsedPercent
+            };
+        }
+        if (name === "network" && networkService) {
+            return {
+                "module": name,
+                "online": networkService.online ? "1" : "0",
+                "device": networkService.device,
+                "state": networkService.online ? "up" : "offline",
+                "kind": networkService.connectionType,
+                "rx": networkService.rxBytes,
+                "tx": networkService.txBytes
+            };
+        }
+        if (name === "battery" && batteryService) {
+            return {
+                "module": name,
+                "present": batteryService.available ? "1" : "0",
+                "device": batteryDeviceName(),
+                "status": batteryService.stateName,
+                "capacity": batteryService.percent,
+                "model_name": batteryService.model,
+                "energy_now": batteryService.energy * 1000000,
+                "energy_full": batteryService.energyCapacity * 1000000,
+                "power_now": batteryService.changeRate * 1000000
+            };
+        }
+        if (name === "powerProfile" && powerProfileService) {
+            return {
+                "module": name,
+                "available": powerProfileService.available ? "1" : "0",
+                "current": powerProfileService.profile,
+                "degradation": powerProfileService.degradationReason
+            };
+        }
+        if (name === "media" && mediaService) {
+            return {
+                "module": name,
+                "available": mediaService.hasPlayer ? "1" : "0",
+                "player": mediaService.playerName,
+                "status": mediaService.status,
+                "title": mediaService.title,
+                "artist": mediaService.artist,
+                "album": mediaService.album
+            };
+        }
+        return null;
+    }
+
+    function syncSharedData() {
+        const data = sharedDataFor(moduleName);
+        if (!data) return;
+
+        mergeDetailData(data);
+        if (moduleName === "cpu")
+            cpuHistory = Array.from(systemStatsService.cpuHistory || []);
+        else if (moduleName === "memory")
+            memoryHistory = Array.from(systemStatsService.memoryHistory || []);
+        else if (moduleName === "network") {
+            networkRxRate = networkService.rxRate;
+            networkTxRate = networkService.txRate;
+        }
+    }
+
+    function rememberSharedSample(name) {
+        if (!panelOpen || moduleName !== name) return;
+        syncSharedData();
+        if (name === "network")
+            networkHistory = rememberHistory(networkHistory, networkProgress());
+        else if (name === "battery" && batteryService)
+            batteryHistory = rememberHistory(batteryHistory, batteryService.percent / 100);
     }
 
     function normalizedTab(tab) {
@@ -117,36 +291,6 @@ PopupWindow {
         return formatBytes(total) + "/s";
     }
 
-    function rememberDetailSample(data) {
-        const name = String((data && data.module) || moduleName);
-
-        if (name === "cpu") {
-            cpuHistory = rememberHistory(cpuHistory, (Number(data.usage) || 0) / 100);
-        } else if (name === "memory") {
-            memoryHistory = rememberHistory(memoryHistory, (Number(data.mem_percent) || 0) / 100);
-        } else if (name === "battery") {
-            batteryHistory = rememberHistory(batteryHistory, (Number(data.capacity) || 0) / 100);
-        } else if (name === "network") {
-            const rx = Number(data.rx) || 0;
-            const tx = Number(data.tx) || 0;
-            const now = Date.now();
-
-            if (previousNetworkStamp > 0 && now > previousNetworkStamp && rx >= previousNetworkRx && tx >= previousNetworkTx) {
-                const seconds = Math.max(0.001, (now - previousNetworkStamp) / 1000);
-                networkRxRate = (rx - previousNetworkRx) / seconds;
-                networkTxRate = (tx - previousNetworkTx) / seconds;
-            } else if (String(data.online || "").toLowerCase() !== "1" && String(data.online || "").toLowerCase() !== "true") {
-                networkRxRate = 0;
-                networkTxRate = 0;
-            }
-
-            previousNetworkRx = rx;
-            previousNetworkTx = tx;
-            previousNetworkStamp = now;
-            networkHistory = rememberHistory(networkHistory, networkProgress());
-        }
-    }
-
     function formatBytes(value) {
         const number = Math.max(0, Number(value) || 0);
         if (number < 1024) return Math.round(number) + " B";
@@ -199,11 +343,10 @@ PopupWindow {
 
         if (data.module !== undefined && data.module !== moduleName) return;
 
-        detailData = data;
+        mergeDetailData(data);
         topRows = top;
         listRows = rows;
         ipRows = ips;
-        rememberDetailSample(data);
     }
 
     function clampedX(value) {
@@ -234,6 +377,11 @@ PopupWindow {
         panelOpen = true;
         activeTab = settings ? normalizedTab(settings.modulePopupDefaultTab) : "Overview";
         clearData();
+        syncSharedData();
+        if (moduleName === "network")
+            rememberSharedSample("network");
+        else if (moduleName === "battery")
+            rememberSharedSample("battery");
         requestRefresh();
     }
 
@@ -289,33 +437,59 @@ PopupWindow {
         return ["cpu", "network", "memory", "battery", "brightness", "bluetooth", "powerProfile", "media"].indexOf(name) >= 0;
     }
 
+    function requiresSupplementalRefresh(name) {
+        return ["cpu", "network", "memory", "battery", "brightness", "bluetooth"].indexOf(name) >= 0;
+    }
+
+    function supplementalRefreshInterval() {
+        if (!settings) return 0;
+        if (moduleName === "cpu") return settings.cpuPollMs;
+        if (moduleName === "network") return settings.networkPollMs;
+        if (moduleName === "memory") return settings.memoryPollMs;
+        if (moduleName === "battery") return settings.batteryFallbackPollMs;
+        if (moduleName === "brightness") return settings.brightnessPollMs;
+        if (moduleName === "bluetooth") return settings.dashboardStatePollMs;
+        return 0;
+    }
+
     function requestRefresh() {
         if (!refreshable(moduleName)) return;
+        syncSharedData();
+        if (!requiresSupplementalRefresh(moduleName)
+                || (settings && settings.performanceMode) || pendingRefresh)
+            return;
         pendingRefresh = true;
-        pendingRefreshTimer.restart();
+        Qt.callLater(function() {
+            if (!root.pendingRefresh) return;
+            root.pendingRefresh = false;
+            root.refresh();
+        });
     }
 
     function refresh() {
-        if (!panelOpen || detailsProc.running || !refreshable(moduleName)) return;
+        if (!panelOpen || !refreshable(moduleName)) return;
+        syncSharedData();
+        if (detailsProc.running || !requiresSupplementalRefresh(moduleName)
+                || (settings && settings.performanceMode))
+            return;
 
         if (moduleName === "cpu") {
-            detailsProc.command = ["sh", "-c", "read _ u n s i io irq sirq st rest < /proc/stat; total=$((u+n+s+i+io+irq+sirq+st)); idle=$((i+io)); sleep 0.15; read _ u2 n2 s2 i2 io2 irq2 sirq2 st2 rest < /proc/stat; total2=$((u2+n2+s2+i2+io2+irq2+sirq2+st2)); idle2=$((i2+io2)); dt=$((total2-total)); di=$((idle2-idle)); usage=0; [ \"$dt\" -gt 0 ] && usage=$((100*(dt-di)/dt)); read l1 l2 l3 rest < /proc/loadavg; printf 'usage=%s\\ncores=%s\\nload=%s %s %s\\n' \"$usage\" \"$(nproc)\" \"$l1\" \"$l2\" \"$l3\"; ps -eo pcpu,comm --sort=-pcpu | awk 'NR>1 && NR<=6 { gsub(/\\|/, \"\", $2); printf \"top=%s|%s\\n\", $2, $1 }'"];
+            detailsProc.command = ["sh", "-c", "read l1 l2 l3 rest < /proc/loadavg; printf 'cores=%s\\nload=%s %s %s\\n' \"$(nproc)\" \"$l1\" \"$l2\" \"$l3\"; ps -eo pcpu,comm --sort=-pcpu | awk 'NR>1 && NR<=6 { gsub(/\\|/, \"\", $2); printf \"top=%s|%s\\n\", $2, $1 }'"];
         } else if (moduleName === "network") {
-            const requested = String(settings.networkInterfaceName || "").trim();
-            const prefix = requested.length > 0 ? "dev=" + shellQuote(requested) : "dev=$(ip -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \\([^ ]*\\).*/\\1/p' | head -1)";
-            detailsProc.command = ["sh", "-c", prefix + "; if [ -z \"$dev\" ] || [ ! -d \"/sys/class/net/$dev\" ]; then printf 'online=0\\nstate=offline\\n'; exit 0; fi; state=$(cat \"/sys/class/net/$dev/operstate\" 2>/dev/null || echo unknown); kind=other; case \"$dev\" in wl*|*wifi*|*wlan*) kind=wifi;; en*|eth*) kind=ethernet;; esac; rx=$(cat \"/sys/class/net/$dev/statistics/rx_bytes\" 2>/dev/null || echo 0); tx=$(cat \"/sys/class/net/$dev/statistics/tx_bytes\" 2>/dev/null || echo 0); printf 'online=1\\ndevice=%s\\nstate=%s\\nkind=%s\\nrx=%s\\ntx=%s\\n' \"$dev\" \"$state\" \"$kind\" \"$rx\" \"$tx\"; ip -brief addr show dev \"$dev\" 2>/dev/null | awk '{ for (i=3; i<=NF; i++) print \"ip=\" $i }'; if command -v iw >/dev/null 2>&1; then iw dev \"$dev\" link 2>/dev/null | awk -F': ' '/SSID/ { print \"ssid=\" $2 } /signal/ { print \"signal=\" $2 } /tx bitrate/ { print \"bitrate=\" $2 }'; fi"];
+            const device = networkService ? String(networkService.device || "") : "";
+            if (device.length <= 0) {
+                ipRows = [];
+                return;
+            }
+            detailsProc.command = ["sh", "-c", "dev=" + shellQuote(device) + "; ip -brief addr show dev \"$dev\" 2>/dev/null | awk '{ for (i=3; i<=NF; i++) print \"ip=\" $i }'; if command -v iw >/dev/null 2>&1; then iw dev \"$dev\" link 2>/dev/null | awk -F': ' '/SSID/ { print \"ssid=\" $2 } /signal/ { print \"signal=\" $2 } /tx bitrate/ { print \"bitrate=\" $2 }'; fi"];
         } else if (moduleName === "memory") {
-            detailsProc.command = ["sh", "-c", "mt=$(awk '/MemTotal:/ {print $2}' /proc/meminfo); ma=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo); st=$(awk '/SwapTotal:/ {print $2}' /proc/meminfo); sf=$(awk '/SwapFree:/ {print $2}' /proc/meminfo); mu=$((mt-ma)); su=$((st-sf)); mp=0; sp=0; [ \"$mt\" -gt 0 ] && mp=$((100*mu/mt)); [ \"$st\" -gt 0 ] && sp=$((100*su/st)); printf 'mem_total=%s\\nmem_available=%s\\nmem_used=%s\\nmem_percent=%s\\nswap_total=%s\\nswap_free=%s\\nswap_used=%s\\nswap_percent=%s\\n' \"$mt\" \"$ma\" \"$mu\" \"$mp\" \"$st\" \"$sf\" \"$su\" \"$sp\""];
+            detailsProc.command = ["sh", "-c", "st=$(awk '/SwapTotal:/ {print $2}' /proc/meminfo); sf=$(awk '/SwapFree:/ {print $2}' /proc/meminfo); su=$((st-sf)); sp=0; [ \"$st\" -gt 0 ] && sp=$((100*su/st)); printf 'swap_total=%s\\nswap_free=%s\\nswap_used=%s\\nswap_percent=%s\\n' \"$st\" \"$sf\" \"$su\" \"$sp\""];
         } else if (moduleName === "battery") {
-            detailsProc.command = ["sh", "-c", "bat=$(find /sys/class/power_supply -maxdepth 1 -name 'BAT*' | head -1); if [ -z \"$bat\" ]; then printf 'present=0\\n'; exit 0; fi; printf 'present=1\\ndevice=%s\\n' \"$(basename \"$bat\")\"; for f in manufacturer model_name status capacity energy_now energy_full energy_full_design power_now voltage_now cycle_count; do [ -r \"$bat/$f\" ] && printf '%s=%s\\n' \"$f\" \"$(cat \"$bat/$f\")\"; done"];
+            detailsProc.command = ["sh", "-c", "bat=$(find /sys/class/power_supply -maxdepth 1 -name 'BAT*' | head -1); [ -n \"$bat\" ] || exit 0; printf 'device=%s\\n' \"$(basename \"$bat\")\"; for f in manufacturer energy_full_design voltage_now cycle_count; do [ -r \"$bat/$f\" ] && printf '%s=%s\\n' \"$f\" \"$(cat \"$bat/$f\")\"; done"];
         } else if (moduleName === "brightness") {
             detailsProc.command = ["sh", "-c", "if command -v brightnessctl >/dev/null 2>&1; then data=$(brightnessctl -m -c backlight info 2>/dev/null || true); if [ -n \"$data\" ]; then dev=$(printf '%s' \"$data\" | cut -d, -f1); cur=$(printf '%s' \"$data\" | cut -d, -f3); pct=$(printf '%s' \"$data\" | grep -o '[0-9][0-9]*%' | head -1 | tr -d %); max=0; [ -n \"$pct\" ] && [ \"$pct\" -gt 0 ] 2>/dev/null && max=$((cur*100/pct)); printf 'available=1\\ncan_set=1\\ndevice=%s\\ncurrent=%s\\nmax=%s\\npercent=%s\\n' \"$dev\" \"$cur\" \"$max\" \"${pct:-0}\"; exit 0; fi; fi; for d in /sys/class/backlight/*; do [ -r \"$d/brightness\" ] || continue; cur=$(cat \"$d/brightness\"); max=$(cat \"$d/max_brightness\"); pct=0; [ \"$max\" -gt 0 ] 2>/dev/null && pct=$((100*cur/max)); printf 'available=1\\ncan_set=0\\ndevice=%s\\ncurrent=%s\\nmax=%s\\npercent=%s\\n' \"$(basename \"$d\")\" \"$cur\" \"$max\" \"$pct\"; exit 0; done; printf 'available=0\\n'"];
         } else if (moduleName === "bluetooth") {
             detailsProc.command = ["sh", "-c", "if ! command -v bluetoothctl >/dev/null 2>&1; then printf 'available=0\\n'; exit 0; fi; out=$(bluetoothctl show 2>/dev/null || true); ctrl=$(printf '%s\\n' \"$out\" | sed -n 's/^Controller //p' | head -1); alias=$(printf '%s\\n' \"$out\" | sed -n 's/^[[:space:]]*Alias: //p' | head -1); powered=$(printf '%s\\n' \"$out\" | sed -n 's/^[[:space:]]*Powered: //p' | head -1); discoverable=$(printf '%s\\n' \"$out\" | sed -n 's/^[[:space:]]*Discoverable: //p' | head -1); pairable=$(printf '%s\\n' \"$out\" | sed -n 's/^[[:space:]]*Pairable: //p' | head -1); blocked=$(printf '%s\\n' \"$out\" | sed -n 's/^[[:space:]]*Blocked: //p' | head -1); printf 'available=1\\ncontroller=%s\\nalias=%s\\npowered=%s\\ndiscoverable=%s\\npairable=%s\\nblocked=%s\\n' \"$ctrl\" \"$alias\" \"$powered\" \"$discoverable\" \"$pairable\" \"$blocked\"; bluetoothctl devices Connected 2>/dev/null | sed 's/^Device //; s/ /|/' | awk '{ print \"row=\" $0 }'"];
-        } else if (moduleName === "powerProfile") {
-            detailsProc.command = ["sh", "-c", "if command -v powerprofilesctl >/dev/null 2>&1; then printf 'available=1\\ncurrent=%s\\n' \"$(powerprofilesctl get 2>/dev/null)\"; powerprofilesctl list 2>/dev/null | sed 's/^..//; s/:$//' | awk 'NF { print \"row=\" $0 \"|available\" }'; else printf 'available=0\\n'; fi"];
-        } else if (moduleName === "media") {
-            detailsProc.command = ["sh", "-c", "if command -v playerctl >/dev/null 2>&1; then playerctl metadata --format 'available=1\\nplayer={{playerName}}\\ntitle={{title}}\\nartist={{artist}}\\nalbum={{album}}' 2>/dev/null || printf 'available=0\\n'; else printf 'available=0\\n'; fi"];
         } else {
             return;
         }
@@ -353,7 +527,7 @@ PopupWindow {
     implicitHeight: detailsFrame.implicitHeight
     visible: panelOpen || panelClosing
     grabFocus: panelOpen
-    color: "transparent"
+    color: theme.transparent
 
     Shortcut {
         sequences: [StandardKey.Cancel]
@@ -371,25 +545,9 @@ PopupWindow {
     }
 
     Timer {
-        id: pendingRefreshTimer
-
-        interval: 40
-        repeat: false
-        onTriggered: {
-            if (!root.pendingRefresh) return;
-            if (detailsProc.running) {
-                restart();
-                return;
-            }
-
-            root.pendingRefresh = false;
-            root.refresh();
-        }
-    }
-
-    Timer {
-        interval: root.moduleName === "cpu" || root.moduleName === "network" ? 2500 : 6000
-        running: root.panelOpen && root.refreshable(root.moduleName)
+        interval: root.supplementalRefreshInterval()
+        running: root.panelOpen && root.settings && !root.settings.performanceMode
+                 && root.requiresSupplementalRefresh(root.moduleName) && interval > 0
         repeat: true
         onTriggered: root.refresh()
     }
@@ -423,6 +581,121 @@ PopupWindow {
             root.refresh();
         }
     }
+
+    Connections {
+        target: root.systemStatsService
+
+        function onSampled() {
+            if (root.moduleName === "cpu" || root.moduleName === "memory")
+                root.syncSharedData();
+        }
+    }
+
+    Connections {
+        target: root.networkService
+
+        function onStateRefreshed() {
+            if (root.moduleName === "network") {
+                root.syncSharedData();
+                root.requestRefresh();
+            }
+        }
+
+        function onThroughputSampled() {
+            root.rememberSharedSample("network");
+        }
+    }
+
+    Connections {
+        target: root.batteryService
+
+        function onPercentChanged() {
+            root.rememberSharedSample("battery");
+        }
+
+        function onStateNameChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onAvailableChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onEnergyChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onEnergyCapacityChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onChangeRateChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onModelChanged() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+
+        function onRefreshed() {
+            if (root.moduleName === "battery")
+                root.syncSharedData();
+        }
+    }
+
+    Connections {
+        target: root.mediaService
+
+        function onHasPlayerChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+        function onPlayerNameChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+        function onStatusChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+        function onTitleChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+        function onArtistChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+        function onAlbumChanged() {
+            if (root.moduleName === "media")
+                root.syncSharedData();
+        }
+    }
+
+    Connections {
+        target: root.powerProfileService
+
+        function onAvailableChanged() {
+            if (root.moduleName === "powerProfile")
+                root.syncSharedData();
+        }
+        function onProfileChanged() {
+            if (root.moduleName === "powerProfile")
+                root.syncSharedData();
+        }
+        function onDegradationReasonChanged() {
+            if (root.moduleName === "powerProfile")
+                root.syncSharedData();
+        }
+    }
+
+    Component.onDestruction: releaseServiceConsumers()
 
     MouseArea {
         anchors.fill: parent

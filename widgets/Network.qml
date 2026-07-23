@@ -1,26 +1,30 @@
 import QtQuick
-import Quickshell.Io
 
 Pill {
     id: root
 
-    property string device: ""
-    property bool online: false
-    property real rxBytes: 0
-    property real txBytes: 0
-    property real rxRate: 0
-    property real txRate: 0
-    property real previousSampleMs: 0
+    property var networkService
+    property var _consumerService: null
+    readonly property bool showSpeed: moduleSettings.showSpeed === undefined
+                                          ? settings.networkShowSpeed
+                                          : Boolean(moduleSettings.showSpeed)
+    readonly property string device: networkService ? String(networkService.device || "") : ""
+    readonly property string connectionName: networkService
+                                                  ? String(networkService.connectionName || "")
+                                                  : ""
+    readonly property bool online: networkService ? Boolean(networkService.online) : false
+    readonly property real rxRate: networkService ? Number(networkService.rxRate) || 0 : 0
+    readonly property real txRate: networkService ? Number(networkService.txRate) || 0 : 0
 
     icon: online ? networkIcon(device) : "󰤮"
     text: networkText()
-    detailText: settings.widgetStyle === "expanded" && online ? (settings.networkShowSpeed ? shortDevice(device) : speedText()) : ""
+    detailText: settings.widgetStyle === "expanded" && online ? (showSpeed ? networkLabel() : speedText()) : ""
     muted: !online
     iconMorphOnChange: settings.iconMorphTransitions
     textPulseOnChange: true
-    maximumTextWidth: settings.networkShowSpeed ? 132 : 72
+    maximumTextWidth: showSpeed ? theme.moduleNetworkSpeedWidth : theme.moduleNetworkLabelWidth
     detailsOnClick: true
-    detailsModuleName: "network"
+    detailsModuleName: moduleInstanceId || "network"
 
     function networkIcon(name) {
         const value = String(name || "").toLowerCase();
@@ -29,17 +33,9 @@ Pill {
         return "󰌘";
     }
 
-    function shortDevice(name) {
-        const value = String(name || "");
-        return value.length > 8 ? value.slice(0, 8) : value;
-    }
-
-    function shellQuote(value) {
-        return "'" + String(value || "").replace(/'/g, "'\\''") + "'";
-    }
-
-    function configuredDevice() {
-        return String(settings.networkInterfaceName || "").trim();
+    function networkLabel() {
+        const value = connectionName.trim();
+        return value.length > 0 ? value : device;
     }
 
     function rateText(value) {
@@ -55,97 +51,29 @@ Pill {
 
     function networkText() {
         if (!online) return "down";
-        return settings.networkShowSpeed ? speedText() : shortDevice(device);
+        return showSpeed ? speedText() : networkLabel();
     }
 
-    function refresh() {
-        const requested = configuredDevice();
-        if (requested.length > 0) {
-            const quoted = shellQuote(requested);
-            proc.command = [
-                "sh",
-                "-c",
-                "test -d /sys/class/net/" + quoted + " && printf '[{\"dev\":\"%s\"}]\\n' " + quoted
-            ];
-        } else {
-            proc.command = ["ip", "-j", "route", "get", "1.1.1.1"];
-        }
-
-        if (!proc.running) proc.running = true;
+    function registerConsumer() {
+        if (_consumerService || !networkService)
+            return;
+        _consumerService = networkService;
+        _consumerService.addConsumer();
     }
 
-    function refreshStats() {
-        if (!settings.networkShowSpeed || !online || device.length === 0 || statsProc.running) return;
-
-        const quoted = shellQuote(device);
-        statsProc.command = [
-            "sh",
-            "-c",
-            "cat /sys/class/net/" + quoted + "/statistics/rx_bytes /sys/class/net/" + quoted + "/statistics/tx_bytes"
-        ];
-        statsProc.running = true;
+    function unregisterConsumer() {
+        if (!_consumerService)
+            return;
+        _consumerService.removeConsumer();
+        _consumerService = null;
     }
 
-    function updateStats(text) {
-        const lines = String(text || "").trim().split(/\s+/).map(Number);
-        if (lines.length < 2 || !Number.isFinite(lines[0]) || !Number.isFinite(lines[1])) return;
-
-        const now = Date.now();
-        if (previousSampleMs > 0) {
-            const seconds = Math.max(0.001, (now - previousSampleMs) / 1000);
-            rxRate = Math.max(0, (lines[0] - rxBytes) / seconds);
-            txRate = Math.max(0, (lines[1] - txBytes) / seconds);
-        }
-
-        rxBytes = lines[0];
-        txBytes = lines[1];
-        previousSampleMs = now;
-    }
-
-    Process {
-        id: proc
-
-        command: ["ip", "-j", "route", "get", "1.1.1.1"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const parsed = JSON.parse(text);
-                    root.device = parsed.length > 0 ? String(parsed[0].dev || "") : "";
-                    root.online = root.device.length > 0;
-                    root.refreshStats();
-                } catch (error) {
-                    root.device = "";
-                    root.online = false;
-                    root.previousSampleMs = 0;
-                }
-            }
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.length > 0) {
-                    root.device = "";
-                    root.online = false;
-                    root.previousSampleMs = 0;
-                }
-            }
+    onNetworkServiceChanged: {
+        if (_consumerService !== networkService) {
+            unregisterConsumer();
+            registerConsumer();
         }
     }
-
-    Process {
-        id: statsProc
-
-        stdout: StdioCollector {
-            onStreamFinished: root.updateStats(text)
-        }
-        stderr: StdioCollector {}
-    }
-
-    Timer {
-        interval: settings.networkPollMs
-        running: true
-        repeat: true
-        onTriggered: root.refresh()
-    }
-
-    Component.onCompleted: root.refresh()
+    Component.onCompleted: registerConsumer()
+    Component.onDestruction: unregisterConsumer()
 }
